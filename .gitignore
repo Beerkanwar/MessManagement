@@ -21,3 +21,7 @@ apps/mobile/ios/
 .DS_Store
 Thumbs.db
 .idea/
+
+
+#Doc
+ImplementationGuide.md
