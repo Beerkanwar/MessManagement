@@ -28,3 +28,32 @@ class VersionedModel(TimeStampedModel):
 
     class Meta:
         abstract = True
+
+
+class InsertOnlyModel(models.Model):
+    """
+    Abstract base model for append-only/immutable tables [SPEC DBDD §16.1].
+    Refuses update and delete at the ORM level.
+    Database-level triggers provide a second guard (added via RunSQL migrations).
+    Tables: AuditLog, BalanceLedgerEntry, BillAdjustment, AttendanceCorrection,
+    StudentVerification, Feedback.
+    """
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when row was created (UTC)"
+    )
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None and not self._state.adding:
+            raise ValueError(
+                f"{self.__class__.__name__} is insert-only and cannot be updated."
+            )
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError(
+            f"{self.__class__.__name__} is insert-only and cannot be deleted."
+        )
