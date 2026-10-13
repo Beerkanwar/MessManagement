@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: Hostel Mess Management System API
+  version: 1.0.0
+  description: Central API contract for Hostel Mess Management System
+paths:
+  /api/v1/admin/settings:
+    get:
+      operationId: admin_settings_retrieve
+      description: Lists institutional configuration parameters [SPEC SDD §151, DEC-11].
+      summary: Get System Settings
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: System settings dictionary
+  /api/v1/attendance:
+    get:
+      operationId: attendance_retrieve
+      description: Lists effective student meal attendance [SPEC SDD §64].
+      summary: List Attendance Records
+      tags:
+      - attendance
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of attendance records
+  /api/v1/auth/login:
+    post:
+      operationId: auth_login_create
+      description: Authenticates user credentials and device info, returning JWT access
+        and refresh tokens [SPEC SDD §11].
+      summary: User Login
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Successful authentication
+        '401':
+          description: Invalid credentials
+  /api/v1/auth/refresh:
+    post:
+      operationId: auth_refresh_create
+      description: Rotates refresh token and returns a new access/refresh token pair
+        [SPEC SDD §11].
+      summary: Rotate Refresh Token
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Token rotated successfully
+        '401':
+          description: Invalid or expired refresh token
+  /api/v1/devices/current:
+    get:
+      operationId: devices_current_retrieve
+      description: Returns current device registration state and last synchronization
+        status [SPEC SDD §11].
+      summary: Get Current Device Binding
+      tags:
+      - devices
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Device details
+  /api/v1/events:
+    get:
+      operationId: events_retrieve
+      description: Lists append-only system audit events [SPEC DBDD §12].
+      summary: List Audit Events
+      tags:
+      - audit
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Audit events list
+  /api/v1/extras/items:
+    get:
+      operationId: extras_items_retrieve
+      description: Lists available extras and prices [SPEC SDD §64].
+      summary: List Extra Items
+      tags:
+      - extras
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of extra items
+  /api/v1/feedback:
+    get:
+      operationId: feedback_retrieve
+      description: Lists submitted student mess feedback [SPEC DBDD §10].
+      summary: List Feedback
+      tags:
+      - feedback
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of feedback records
+  /api/v1/hostels:
+    get:
+      operationId: hostels_retrieve
+      description: Lists all institutional hostels [SPEC SDD §64].
+      summary: List Hostels
+      tags:
+      - hostels
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of hostels
+  /api/v1/meals/types:
+    get:
+      operationId: meals_types_retrieve
+      description: Lists fixed meal types (Breakfast, Lunch, Evening Snacks, Dinner)
+        [SPEC DBDD §1].
+      summary: List Meal Types
+      tags:
+      - meals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of meal types
+  /api/v1/menus:
+    get:
+      operationId: menus_retrieve
+      description: Lists published and draft menus [SPEC DBDD §9].
+      summary: List Menus
+      tags:
+      - menus
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of menus
+  /api/v1/messes:
+    get:
+      operationId: messes_retrieve
+      description: Lists all institutional dining mess halls [SPEC SDD §64].
+      summary: List Messes
+      tags:
+      - messes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of messes
+  /api/v1/pauses:
+    get:
+      operationId: pauses_retrieve
+      description: Lists student mess pause records [SPEC SDD §64, DBDD §7].
+      summary: List Mess Pauses
+      tags:
+      - pauses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of mess pauses
+  /api/v1/periods:
+    get:
+      operationId: periods_retrieve
+      description: Lists billing periods and their lifecycle states [SPEC DBDD §8].
+      summary: List Billing Periods
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of billing periods
+  /api/v1/qr/secret:
+    get:
+      operationId: qr_secret_retrieve
+      description: Returns the active rolling QR secret key for the authenticated
+        student [SPEC SDD §19].
+      summary: Get Student QR Secret
+      tags:
+      - qr
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: QR secret payload
+  /api/v1/reports:
+    get:
+      operationId: reports_retrieve
+      description: Lists available institutional reports per user role [DEC-15].
+      summary: List Reports Catalog
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Reports list
+  /api/v1/students:
+    get:
+      operationId: students_retrieve
+      description: Lists students scoped by user authority [SPEC SDD §64].
+      summary: List Students
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of students
+  /api/v1/upload:
+    post:
+      operationId: upload_create
+      description: Synchronizes offline transactions uploaded by Mess Managers [SPEC
+        SDD §67, §68].
+      summary: Manager Batch Upload
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Batch sync results
+  /health/live:
+    get:
+      operationId: health_live_retrieve
+      description: Returns HTTP 200 when the backend web process is up and accepting
+        HTTP traffic.
+      summary: Process Liveness Probe
+      tags:
+      - health
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Process is alive
+  /health/ready:
+    get:
+      operationId: health_ready_retrieve
+      description: Verifies that the database is reachable and that all database migrations
+        have been applied. Returns HTTP 503 if the database is unreachable or migrations
+        are pending.
+      summary: Readiness Probe
+      tags:
+      - health
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: Database connected and migrations applied
+        '503':
+          description: Database unreachable or pending migrations
+components:
+  securitySchemes:
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

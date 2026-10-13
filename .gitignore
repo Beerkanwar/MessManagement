@@ -1,6 +1,8 @@
 # Secrets
 .env
 *.env.local
+.antigravityrules
+
 
 # Python
 .venv/
