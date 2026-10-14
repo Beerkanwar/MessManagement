@@ -7,6 +7,9 @@ from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 
 
+from apps.identity.selectors import get_user_role
+
+
 class IsSuperAdmin(BasePermission):
     """Allows access only to Super Admin users."""
 
@@ -15,8 +18,7 @@ class IsSuperAdmin(BasePermission):
             return False
         if getattr(request.user, "is_superuser", False):
             return True
-        role = getattr(request.user, "role", None)
-        return role == "SUPER_ADMIN"
+        return get_user_role(request.user) == "SUPER_ADMIN"
 
 
 class IsHostelClerk(BasePermission):
@@ -25,7 +27,7 @@ class IsHostelClerk(BasePermission):
     def has_permission(self, request: Request, view: Any) -> bool:
         if not request.user or not request.user.is_authenticated:
             return False
-        role = getattr(request.user, "role", None)
+        role = get_user_role(request.user)
         return role == "HOSTEL_CLERK" or getattr(request.user, "is_superuser", False)
 
 
@@ -35,7 +37,7 @@ class IsMessManager(BasePermission):
     def has_permission(self, request: Request, view: Any) -> bool:
         if not request.user or not request.user.is_authenticated:
             return False
-        role = getattr(request.user, "role", None)
+        role = get_user_role(request.user)
         return role == "MESS_MANAGER" or getattr(request.user, "is_superuser", False)
 
 
@@ -45,5 +47,4 @@ class IsStudent(BasePermission):
     def has_permission(self, request: Request, view: Any) -> bool:
         if not request.user or not request.user.is_authenticated:
             return False
-        role = getattr(request.user, "role", None)
-        return role == "STUDENT"
+        return get_user_role(request.user) == "STUDENT"

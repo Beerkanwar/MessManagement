@@ -9,6 +9,7 @@ DEBUG = False
 # Fast password hasher for test execution speed [ImplementationGuide Phase 1]
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
 ]
 
 # Fast in-memory sinks for tests

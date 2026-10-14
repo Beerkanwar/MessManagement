@@ -9,6 +9,7 @@ from typing import Any
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.db import models
+from django.utils import timezone as django_tz
 from apps.core.models import TimeStampedModel, VersionedModel
 
 

@@ -98,18 +98,43 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
     if response is not None:
         # Standard DRF APIException was handled
         http_status = response.status_code
-        error_code = map_status_to_code(http_status)
 
-        # Extract message cleanly
-        if isinstance(response.data, dict) and "detail" in response.data:
-            message = str(response.data["detail"])
-        elif isinstance(response.data, dict):
-            # Form or serializer validation error dict
-            message = "Validation failed. Check submitted fields."
+        # Fix DRF 403 mutation: when a view lacks an authenticator header, DRF mutates
+        # AuthenticationFailed / NotAuthenticated status from 401 to 403.
+        # Enforces SPEC SDD §88 and §89: 401 UNAUTHORIZED for authentication failures.
+        if isinstance(exc, (exceptions.AuthenticationFailed, exceptions.NotAuthenticated)):
+            http_status = status.HTTP_401_UNAUTHORIZED
+            response.status_code = status.HTTP_401_UNAUTHORIZED
+            if "WWW-Authenticate" not in response:
+                response["WWW-Authenticate"] = 'Bearer realm="api"'
+
+        error_code = map_status_to_code(http_status)
+        message = None
+
+        if isinstance(response.data, dict):
+            if "code" in response.data:
+                error_code = str(response.data["code"])
+            if "message" in response.data:
+                message = str(response.data["message"])
+            elif "detail" in response.data:
+                detail_val = response.data["detail"]
+                message = str(detail_val)
+                if hasattr(detail_val, "code") and detail_val.code and detail_val.code not in ("invalid", "not_authenticated"):
+                    candidate_code = str(detail_val.code).upper()
+                    if candidate_code in ERROR_REGISTRY:
+                        error_code = candidate_code
+            else:
+                first_key = next(iter(response.data), None)
+                if first_key and isinstance(response.data[first_key], list) and response.data[first_key]:
+                    message = f"{first_key}: {response.data[first_key][0]}"
+                else:
+                    message = "Validation failed. Check submitted fields."
         elif isinstance(response.data, list) and response.data:
             message = str(response.data[0])
-        else:
-            message = ERROR_REGISTRY.get(error_code, ERROR_REGISTRY[ErrorCodes.INTERNAL_SERVER_ERROR]).default_message
+
+        if not message:
+            reg = ERROR_REGISTRY.get(error_code)
+            message = reg.default_message if reg else "An error occurred."
 
         return Response(
             {

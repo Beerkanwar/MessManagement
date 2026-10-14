@@ -136,6 +136,14 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# Password Hashers - Argon2id primary per ImplementationGuide Phase 3 & DEC-11
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+]
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     # JSON-only renderers and parsers (multipart enabled only on import endpoint) [REC]
@@ -150,7 +158,7 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.identity.authentication.DeviceBindingJWTAuthentication",
     ],
     # Pagination: default 50, max 200 [ImplementationGuide Phase 1]
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPageNumberPagination",

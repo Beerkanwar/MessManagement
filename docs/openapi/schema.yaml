@@ -4,6 +4,37 @@ info:
   version: 1.0.0
   description: Central API contract for Hostel Mess Management System
 paths:
+  /api/v1/admin/devices/{device_id}/revoke:
+    post:
+      operationId: admin_devices_revoke_create
+      description: Super Admin revokes a device session. Enforces D14 sync waiting
+        for managers [SPEC SDD §121].
+      summary: Admin Revoke Device
+      parameters:
+      - in: path
+        name: device_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRevokeDeviceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Device revoked or marked pending sync
+        '400':
+          description: Reason required
+        '403':
+          description: Permission denied
+        '404':
+          description: Device not found
   /api/v1/admin/settings:
     get:
       operationId: admin_settings_retrieve
@@ -28,44 +59,174 @@ paths:
       responses:
         '200':
           description: List of attendance records
+  /api/v1/auth/change-password:
+    post:
+      operationId: auth_change_password_create
+      description: Changes password for authenticated user [SPEC SDD §12].
+      summary: Change Password
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Incorrect current password or policy failure
+        '401':
+          description: Unauthenticated
+  /api/v1/auth/forgot-password:
+    post:
+      operationId: auth_forgot_password_create
+      description: Dispatches 6-digit verification OTP by email. Always returns 202
+        [SPEC SRS §5, SDD §12].
+      summary: Forgot Password / Request Reset OTP
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '202':
+          description: OTP dispatched if account exists
+        '429':
+          description: Hourly rate limit exceeded
   /api/v1/auth/login:
     post:
       operationId: auth_login_create
-      description: Authenticates user credentials and device info, returning JWT access
-        and refresh tokens [SPEC SDD §11].
+      description: Authenticates credentials, binds single active device, and returns
+        token pair [SPEC SDD §11].
       summary: User Login
       tags:
       - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequestRequest'
+        required: true
       security:
-      - jwtAuth: []
       - {}
       responses:
         '200':
           description: Successful authentication
         '401':
-          description: Invalid credentials
-  /api/v1/auth/refresh:
+          description: Invalid credentials or inactive account
+        '403':
+          description: Wrong client surface for role
+        '409':
+          description: Previous manager device has unsynced transactions
+        '429':
+          description: Too many failed login attempts (locked 15 min)
+  /api/v1/auth/logout:
     post:
-      operationId: auth_refresh_create
-      description: Rotates refresh token and returns a new access/refresh token pair
-        [SPEC SDD §11].
-      summary: Rotate Refresh Token
+      operationId: auth_logout_create
+      description: Revokes current device session and refresh tokens immediately [SPEC
+        SDD §11].
+      summary: User Logout
       tags:
       - auth
       security:
       - jwtAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+        '401':
+          description: Unauthenticated
+  /api/v1/auth/me:
+    get:
+      operationId: auth_me_retrieve
+      description: Returns current user identity, role, and assigned hostel/mess scopes
+        [SPEC SDD §11].
+      summary: Current User Profile & Scope [REC]
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: User profile and role summary
+        '401':
+          description: Unauthenticated
+  /api/v1/auth/refresh:
+    post:
+      operationId: auth_refresh_create
+      description: Rotates opaque refresh token with 30s replay grace window [SPEC
+        SDD §11, DEC-10].
+      summary: Rotate Refresh Token
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequestRequest'
+        required: true
+      security:
       - {}
       responses:
         '200':
-          description: Token rotated successfully
+          description: New token pair issued
         '401':
-          description: Invalid or expired refresh token
+          description: Invalid, expired, or stolen refresh token
+  /api/v1/auth/reset-password:
+    post:
+      operationId: auth_reset_password_create
+      description: Sets new password with verified OTP, revoking all active sessions
+        [SPEC SDD §12].
+      summary: Reset Password with OTP
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          description: Invalid OTP or policy failure
+  /api/v1/auth/verify-otp:
+    post:
+      operationId: auth_verify_otp_create
+      description: Validates OTP code without consuming it [SPEC SDD §12, DEC-11].
+      summary: Verify Password Reset OTP
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          description: OTP verified successfully
+        '400':
+          description: Invalid OTP or attempts exceeded
   /api/v1/devices/current:
     get:
       operationId: devices_current_retrieve
-      description: Returns current device registration state and last synchronization
-        status [SPEC SDD §11].
-      summary: Get Current Device Binding
+      description: Returns current device session state and last sync time [SPEC SDD
+        §11].
+      summary: Current Device Binding
       tags:
       - devices
       security:
@@ -73,6 +234,43 @@ paths:
       responses:
         '200':
           description: Device details
+        '401':
+          description: Unauthenticated
+  /api/v1/devices/register:
+    post:
+      operationId: devices_register_create
+      description: Updates app version, device name, and platform for current device
+        [SPEC SDD §11].
+      summary: Update Device Metadata
+      tags:
+      - devices
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceMetadataRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Device metadata updated
+        '401':
+          description: Unauthenticated
+  /api/v1/devices/revoke:
+    post:
+      operationId: devices_revoke_create
+      description: Revokes authority of current device session immediately [SPEC SDD
+        §11].
+      summary: Self-Revoke Current Device
+      tags:
+      - devices
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Device revoked successfully
+        '401':
+          description: Unauthenticated
   /api/v1/events:
     get:
       operationId: events_retrieve
@@ -264,6 +462,144 @@ paths:
         '503':
           description: Database unreachable or pending migrations
 components:
+  schemas:
+    AdminRevokeDeviceRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          description: Mandatory business reason for device revocation
+      required:
+      - reason
+    ChangePasswordRequestRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 10
+      required:
+      - current_password
+      - new_password
+    ForgotPasswordRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Account email address
+      required:
+      - email
+    LoginRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Institutional college email address
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+        device_id:
+          type: string
+          minLength: 1
+          description: Client-generated unique device identifier
+          maxLength: 255
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/PlatformEnum'
+          description: |-
+            Client platform
+
+            * `ANDROID` - ANDROID
+            * `IOS` - IOS
+            * `WEB` - WEB
+        app_version:
+          type: string
+          default: ''
+          maxLength: 50
+        device_name:
+          type: string
+          default: ''
+          maxLength: 255
+      required:
+      - device_id
+      - email
+      - password
+      - platform
+    PlatformEnum:
+      enum:
+      - ANDROID
+      - IOS
+      - WEB
+      type: string
+      description: |-
+        * `ANDROID` - ANDROID
+        * `IOS` - IOS
+        * `WEB` - WEB
+    RefreshTokenRequestRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+          description: 256-bit opaque refresh token
+      required:
+      - refresh
+    ResetPasswordRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        otp:
+          type: string
+          minLength: 6
+          description: 6-digit numerical OTP code
+          maxLength: 6
+        new_password:
+          type: string
+          writeOnly: true
+          minLength: 10
+      required:
+      - email
+      - new_password
+      - otp
+    UpdateDeviceMetadataRequest:
+      type: object
+      properties:
+        app_version:
+          type: string
+          maxLength: 50
+        device_name:
+          type: string
+          maxLength: 255
+        platform:
+          $ref: '#/components/schemas/PlatformEnum'
+    VerifyOtpRequestRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+        otp:
+          type: string
+          minLength: 6
+          description: 6-digit numerical OTP code
+          maxLength: 6
+      required:
+      - email
+      - otp
   securitySchemes:
     jwtAuth:
       type: http

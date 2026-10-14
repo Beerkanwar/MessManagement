@@ -5,6 +5,7 @@ ExclusionConstraint on assignment date ranges added via RunSQL migration.
 """
 from django.conf import settings
 from django.db import models
+from django.utils import timezone as django_tz
 from apps.core.models import VersionedModel, InsertOnlyModel
 
 
