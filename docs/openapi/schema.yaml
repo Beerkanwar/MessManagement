@@ -365,16 +365,215 @@ paths:
           description: Setting created/updated
   /api/v1/attendance:
     get:
-      operationId: attendance_retrieve
-      description: Lists effective student meal attendance [SPEC SDD §64].
-      summary: List Attendance Records
+      operationId: attendance_list
+      description: Lists effective meal attendance records scoped to caller role [SPEC
+        SDD §64, ImplementationGuide Phase 7]. A record is included unless its latest
+        applied correction is REMOVE_INCORRECT.
+      summary: List Effective Attendance
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter meals on or before YYYY-MM-DD
+      - in: query
+        name: hostel_id
+        schema:
+          type: integer
+        description: Filter by hostel ID
+      - in: query
+        name: meal_type
+        schema:
+          type: string
+        description: Filter by meal type code (BREAKFAST, LUNCH, DINNER)
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter by mess ID
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter meals on or after YYYY-MM-DD
+      - in: query
+        name: student_id
+        schema:
+          type: integer
+        description: Filter by student ID
       tags:
       - attendance
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: List of attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealConsumption'
+          description: ''
+  /api/v1/attendance/corrections:
+    get:
+      operationId: attendance_corrections_list
+      description: |-
+        GET: Lists correction history scoped to caller role.
+        POST: Submits an online attendance correction (ADD_MISSING or REMOVE_INCORRECT) [SPEC SRS §32, DEC-12, DEC-22]. Allowed for Super Admin, Hostel Clerk (own hostel), and Mess Manager (own mess). Reason required (min 5 chars).
+      summary: List or Submit Attendance Corrections
+      parameters:
+      - in: query
+        name: action
+        schema:
+          type: string
+        description: Filter by action (ADD_MISSING or REMOVE_INCORRECT)
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter corrections on or before YYYY-MM-DD
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter by mess ID
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter corrections on or after YYYY-MM-DD
+      - in: query
+        name: student_id
+        schema:
+          type: integer
+        description: Filter by student ID
+      tags:
+      - attendance
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceCorrection'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceCorrection'
+          description: Correction applied
+        '400':
+          description: Validation error, missing reason, or locked billing period
+        '404':
+          description: Student or scope not found [D12]
+    post:
+      operationId: attendance_corrections_create
+      description: |-
+        GET: Lists correction history scoped to caller role.
+        POST: Submits an online attendance correction (ADD_MISSING or REMOVE_INCORRECT) [SPEC SRS §32, DEC-12, DEC-22]. Allowed for Super Admin, Hostel Clerk (own hostel), and Mess Manager (own mess). Reason required (min 5 chars).
+      summary: List or Submit Attendance Corrections
+      parameters:
+      - in: query
+        name: action
+        schema:
+          type: string
+        description: Filter by action (ADD_MISSING or REMOVE_INCORRECT)
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter corrections on or before YYYY-MM-DD
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter by mess ID
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter corrections on or after YYYY-MM-DD
+      - in: query
+        name: student_id
+        schema:
+          type: integer
+        description: Filter by student ID
+      tags:
+      - attendance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceCorrectionCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceCorrection'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceCorrection'
+          description: Correction applied
+        '400':
+          description: Validation error, missing reason, or locked billing period
+        '404':
+          description: Student or scope not found [D12]
+  /api/v1/attendance/summary:
+    get:
+      operationId: attendance_summary_retrieve
+      description: Returns aggregated counts of meals by type and total price snapshot
+        for the caller scope.
+      summary: Get Attendance Summary
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Summary end date YYYY-MM-DD
+      - in: query
+        name: hostel_id
+        schema:
+          type: integer
+        description: Filter by hostel ID
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter by mess ID
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Summary start date YYYY-MM-DD
+      - in: query
+        name: student_id
+        schema:
+          type: integer
+        description: Filter by student ID
+      tags:
+      - attendance
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSummary'
+          description: ''
   /api/v1/auth/change-password:
     post:
       operationId: auth_change_password_create
@@ -797,6 +996,56 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ExtraPrice'
+          description: ''
+  /api/v1/extras/transactions:
+    get:
+      operationId: extras_transactions_list
+      description: Lists extra item purchase transactions scoped to caller role [SPEC
+        SDD §64].
+      summary: List Extra Transactions
+      parameters:
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Filter extras on or before YYYY-MM-DD
+      - in: query
+        name: extra_item_id
+        schema:
+          type: integer
+        description: Filter by extra item ID
+      - in: query
+        name: hostel_id
+        schema:
+          type: integer
+        description: Filter by hostel ID
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter by mess ID
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Filter extras on or after YYYY-MM-DD
+      - in: query
+        name: student_id
+        schema:
+          type: integer
+        description: Filter by student ID
+      tags:
+      - extras
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraTransaction'
           description: ''
   /api/v1/feedback:
     get:
@@ -1831,6 +2080,156 @@ components:
       required:
       - status
       - version
+    AttendanceCorrection:
+      type: object
+      properties:
+        correction_id:
+          type: integer
+          readOnly: true
+        correction_transaction_id:
+          type: string
+          format: uuid
+        student_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        meal_date:
+          type: string
+          format: date
+          description: MealDate corrected
+        meal_type_id:
+          type: integer
+          readOnly: true
+        meal_type_code:
+          type: string
+          readOnly: true
+        action:
+          $ref: '#/components/schemas/AttendanceCorrectionActionEnum'
+        original_meal_consumption_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        requested_at:
+          type: string
+          format: date-time
+        applied_at:
+          type: string
+          format: date-time
+          nullable: true
+        reason:
+          type: string
+          description: Mandatory reason (min 5 chars) [DEC-12, D12]
+        actor_email:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/AttendanceCorrectionStatusEnum'
+      required:
+      - action
+      - actor_email
+      - correction_id
+      - correction_transaction_id
+      - meal_date
+      - meal_type_code
+      - meal_type_id
+      - mess_id
+      - original_meal_consumption_id
+      - reason
+      - requested_at
+      - student_id
+    AttendanceCorrectionActionEnum:
+      enum:
+      - ADD_MISSING
+      - REMOVE_INCORRECT
+      type: string
+      description: |-
+        * `ADD_MISSING` - Add Missing
+        * `REMOVE_INCORRECT` - Remove Incorrect
+    AttendanceCorrectionCreateActionEnum:
+      enum:
+      - ADD_MISSING
+      - REMOVE_INCORRECT
+      type: string
+      description: |-
+        * `ADD_MISSING` - ADD_MISSING
+        * `REMOVE_INCORRECT` - REMOVE_INCORRECT
+    AttendanceCorrectionCreateRequest:
+      type: object
+      properties:
+        correction_transaction_id:
+          type: string
+          format: uuid
+          description: Client-generated idempotent UUID for the correction
+        student_id:
+          type: integer
+          description: Student ID being corrected
+        meal_date:
+          type: string
+          format: date
+          description: MealDate (IST calendar date) to correct
+        meal_type:
+          type: string
+          minLength: 1
+          description: 'Meal type code: BREAKFAST, LUNCH, or DINNER'
+        action:
+          allOf:
+          - $ref: '#/components/schemas/AttendanceCorrectionCreateActionEnum'
+          description: |-
+            Action to take: ADD_MISSING or REMOVE_INCORRECT
+
+            * `ADD_MISSING` - ADD_MISSING
+            * `REMOVE_INCORRECT` - REMOVE_INCORRECT
+        reason:
+          type: string
+          minLength: 5
+          description: Mandatory operational reason (minimum 5 characters)
+          maxLength: 1000
+      required:
+      - action
+      - correction_transaction_id
+      - meal_date
+      - meal_type
+      - reason
+      - student_id
+    AttendanceCorrectionStatusEnum:
+      enum:
+      - APPLIED
+      - REJECTED
+      type: string
+      description: |-
+        * `APPLIED` - Applied
+        * `REJECTED` - Rejected
+    AttendanceSummary:
+      type: object
+      properties:
+        breakfast_count:
+          type: integer
+        lunch_count:
+          type: integer
+        dinner_count:
+          type: integer
+        total_meals:
+          type: integer
+        total_amount:
+          type: string
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - breakfast_count
+      - dinner_count
+      - end_date
+      - lunch_count
+      - start_date
+      - total_amount
+      - total_meals
     BulkRejectRequest:
       type: object
       properties:
@@ -2065,6 +2464,86 @@ components:
       required:
       - effective_from
       - unit_price
+    ExtraTransaction:
+      type: object
+      properties:
+        extra_transaction_id:
+          type: integer
+          readOnly: true
+        transaction_id:
+          type: string
+          format: uuid
+          description: Stable GUID assigned before local persistence [DBDD §6.1, Invariant
+            5]
+        student_id:
+          type: integer
+          readOnly: true
+        roll_number:
+          type: string
+          readOnly: true
+        student_name:
+          type: string
+          readOnly: true
+        extra_item_id:
+          type: integer
+          readOnly: true
+        extra_item_name:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Units consumed, must be > 0
+        unit_price_at_transaction:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Price snapshot at transaction time [DBDD §5.2]
+        total_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Quantity * unit_price_at_transaction
+        transaction_timestamp:
+          type: string
+          format: date-time
+        source:
+          $ref: '#/components/schemas/ExtraTransactionSourceEnum'
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - extra_item_id
+      - extra_item_name
+      - extra_transaction_id
+      - hostel_id
+      - mess_id
+      - quantity
+      - roll_number
+      - student_id
+      - student_name
+      - total_amount
+      - transaction_id
+      - transaction_timestamp
+      - unit_price_at_transaction
+    ExtraTransactionSourceEnum:
+      enum:
+      - SCAN_CONFIRMATION
+      - MANUAL
+      - SYNC_RESOLUTION
+      type: string
+      description: |-
+        * `SCAN_CONFIRMATION` - Scan Confirmation
+        * `MANUAL` - Manual
+        * `SYNC_RESOLUTION` - Sync Resolution
     ForgotPasswordRequestRequest:
       type: object
       properties:
@@ -2264,6 +2743,85 @@ components:
       - email
       - password
       - platform
+    MealConsumption:
+      type: object
+      properties:
+        meal_consumption_id:
+          type: integer
+          readOnly: true
+        transaction_id:
+          type: string
+          format: uuid
+          description: Stable GUID assigned before local persistence [DBDD §6.1, Invariant
+            5]
+        student_id:
+          type: integer
+          readOnly: true
+        roll_number_snapshot:
+          type: string
+          description: Denormalized roll number snapshot at scan time
+          maxLength: 50
+        student_name:
+          type: string
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_name:
+          type: string
+          readOnly: true
+        meal_type_id:
+          type: integer
+          readOnly: true
+        meal_type_code:
+          type: string
+          readOnly: true
+        meal_date:
+          type: string
+          format: date
+          description: Scheduled date of the meal (IST calendar) [DEC-01, DBDD §5.1]
+        price_at_transaction:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Immutable rate snapshot at transaction time [DBDD §5.2]
+        transaction_timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when scan occurred on client (UTC)
+        verification_method:
+          $ref: '#/components/schemas/VerificationMethodEnum'
+        verification_result:
+          $ref: '#/components/schemas/VerificationResultEnum'
+        source:
+          $ref: '#/components/schemas/MealConsumptionSourceEnum'
+        accepted_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - meal_consumption_id
+      - meal_date
+      - meal_type_code
+      - meal_type_id
+      - mess_id
+      - mess_name
+      - price_at_transaction
+      - roll_number_snapshot
+      - student_id
+      - student_name
+      - transaction_id
+      - transaction_timestamp
+    MealConsumptionSourceEnum:
+      enum:
+      - QR
+      - CORRECTION
+      - SYNC_RESOLUTION
+      type: string
+      description: |-
+        * `QR` - QR
+        * `CORRECTION` - Correction
+        * `SYNC_RESOLUTION` - Sync Resolution
     MealOccurrence:
       type: object
       properties:
@@ -3142,6 +3700,22 @@ components:
           maxLength: 255
         platform:
           $ref: '#/components/schemas/Platform33cEnum'
+    VerificationMethodEnum:
+      enum:
+      - QR_HMAC_SHA256
+      - MANUAL_CORRECTION
+      type: string
+      description: |-
+        * `QR_HMAC_SHA256` - QR HMAC-SHA256
+        * `MANUAL_CORRECTION` - Manual Correction
+    VerificationResultEnum:
+      enum:
+      - SUCCESS
+      - NOT_APPLICABLE
+      type: string
+      description: |-
+        * `SUCCESS` - Success
+        * `NOT_APPLICABLE` - Not Applicable
     VerifyAssignmentRequest:
       type: object
       properties:
