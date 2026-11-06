@@ -4,6 +4,140 @@ info:
   version: 1.0.0
   description: Central API contract for Hostel Mess Management System
 paths:
+  /api/v1/admin/app-versions:
+    get:
+      operationId: admin_app_versions_list
+      description: Manage client application version policies (SUPPORTED, DEPRECATED,
+        BLOCKED) [DEC-18].
+      summary: List or Create Application Version Policies
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+    post:
+      operationId: admin_app_versions_create
+      description: Manage client application version policies (SUPPORTED, DEPRECATED,
+        BLOCKED) [DEC-18].
+      summary: List or Create Application Version Policies
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationVersionPolicyCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+  /api/v1/admin/app-versions/{policy_id}:
+    get:
+      operationId: admin_app_versions_retrieve
+      description: Retrieve, update or delete a specific application version policy
+        by id.
+      summary: Get, Update, or Delete Version Policy
+      parameters:
+      - in: path
+        name: policy_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+        '204':
+          description: Policy deleted
+    put:
+      operationId: admin_app_versions_update
+      description: Retrieve, update or delete a specific application version policy
+        by id.
+      summary: Get, Update, or Delete Version Policy
+      parameters:
+      - in: path
+        name: policy_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplicationVersionPolicyUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+        '204':
+          description: Policy deleted
+    delete:
+      operationId: admin_app_versions_destroy
+      description: Retrieve, update or delete a specific application version policy
+        by id.
+      summary: Get, Update, or Delete Version Policy
+      parameters:
+      - in: path
+        name: policy_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationVersionPolicy'
+          description: ''
+        '204':
+          description: Policy deleted
   /api/v1/admin/devices/{device_id}/revoke:
     post:
       operationId: admin_devices_revoke_create
@@ -35,18 +169,200 @@ paths:
           description: Permission denied
         '404':
           description: Device not found
-  /api/v1/admin/settings:
+  /api/v1/admin/hostel-clerks:
     get:
-      operationId: admin_settings_retrieve
-      description: Lists institutional configuration parameters [SPEC SDD §151, DEC-11].
-      summary: Get System Settings
+      operationId: admin_hostel_clerks_retrieve
+      summary: List Hostel Clerks
       tags:
       - admin
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: System settings dictionary
+          description: List of clerks
+    post:
+      operationId: admin_hostel_clerks_create
+      summary: Create Hostel Clerk
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClerkCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: Clerk created
+  /api/v1/admin/hostel-clerks/{user_id}/deactivate:
+    post:
+      operationId: admin_hostel_clerks_deactivate_create
+      description: Deactivates a Clerk's assignment.
+      summary: Deactivate Hostel Clerk
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Clerk deactivated
+  /api/v1/admin/hostel-clerks/{user_id}/reassign:
+    post:
+      operationId: admin_hostel_clerks_reassign_create
+      description: Reassigns a Clerk to a different hostel.
+      summary: Reassign Hostel Clerk
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClerkReassignRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Clerk reassigned
+  /api/v1/admin/mess-managers:
+    get:
+      operationId: admin_mess_managers_list
+      description: Super Admin management of Mess Manager accounts and assignments
+        [DEC-21].
+      summary: List or Create Mess Managers
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessManagerAssignment'
+          description: ''
+        '201':
+          description: Mess Manager created
+    post:
+      operationId: admin_mess_managers_create
+      description: Super Admin management of Mess Manager accounts and assignments
+        [DEC-21].
+      summary: List or Create Mess Managers
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessManagerCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MessManagerAssignment'
+          description: ''
+        '201':
+          description: Mess Manager created
+  /api/v1/admin/mess-managers/{user_id}/deactivate:
+    post:
+      operationId: admin_mess_managers_deactivate_create
+      description: Deactivates a Mess Manager's assignment.
+      summary: Deactivate Mess Manager
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Mess Manager deactivated
+  /api/v1/admin/mess-managers/{user_id}/reassign:
+    post:
+      operationId: admin_mess_managers_reassign_create
+      description: Reassigns a Mess Manager to a different mess (Super Admin only)
+        [DEC-21].
+      summary: Reassign Mess Manager
+      parameters:
+      - in: path
+        name: user_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessManagerReassignRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Mess Manager reassigned
+  /api/v1/admin/settings:
+    get:
+      operationId: admin_settings_retrieve
+      description: Super Admin management of institutional configuration parameters
+        [SPEC SDD §151, DEC-11].
+      summary: Get or Update System Settings
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of settings or updated setting
+        '201':
+          description: Setting created/updated
+    post:
+      operationId: admin_settings_create
+      description: Super Admin management of institutional configuration parameters
+        [SPEC SDD §151, DEC-11].
+      summary: Get or Update System Settings
+      tags:
+      - admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemSettingUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of settings or updated setting
+        '201':
+          description: Setting created/updated
   /api/v1/attendance:
     get:
       operationId: attendance_retrieve
@@ -285,16 +601,203 @@ paths:
           description: Audit events list
   /api/v1/extras/items:
     get:
-      operationId: extras_items_retrieve
-      description: Lists available extras and prices [SPEC SDD §64].
-      summary: List Extra Items
+      operationId: extras_items_list
+      description: Clerk (own hostel) or Super Admin creates/manages extra items;
+        Manager reads scoped items.
+      summary: List or Create Extra Items
       tags:
       - extras
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: List of extra items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraItem'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraItem'
+          description: ''
+    post:
+      operationId: extras_items_create
+      description: Clerk (own hostel) or Super Admin creates/manages extra items;
+        Manager reads scoped items.
+      summary: List or Create Extra Items
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraItemCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraItem'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraItem'
+          description: ''
+  /api/v1/extras/items/{item_id}:
+    get:
+      operationId: extras_items_retrieve
+      description: Retrieve extra item details or update its display name with optimistic
+        locking.
+      summary: Get or Update Extra Item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - extras
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraItem'
+          description: ''
+    put:
+      operationId: extras_items_update
+      description: Retrieve extra item details or update its display name with optimistic
+        locking.
+      summary: Get or Update Extra Item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraItemUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraItem'
+          description: ''
+  /api/v1/extras/items/{item_id}/deactivate:
+    post:
+      operationId: extras_items_deactivate_create
+      description: Deactivate an extra item (Clerk own hostel or Super Admin).
+      summary: Deactivate Extra Item
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraItemDeactivateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraItem'
+          description: ''
+  /api/v1/extras/items/{item_id}/prices:
+    get:
+      operationId: extras_items_prices_list
+      description: List price versions or add a new effective-dated price version.
+      summary: List or Create Extra Prices
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - extras
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraPrice'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraPrice'
+          description: ''
+    post:
+      operationId: extras_items_prices_create
+      description: List price versions or add a new effective-dated price version.
+      summary: List or Create Extra Prices
+      parameters:
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - extras
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtraPriceCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExtraPrice'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExtraPrice'
+          description: ''
   /api/v1/feedback:
     get:
       operationId: feedback_retrieve
@@ -309,8 +812,8 @@ paths:
           description: List of feedback records
   /api/v1/hostels:
     get:
-      operationId: hostels_retrieve
-      description: Lists all institutional hostels [SPEC SDD §64].
+      operationId: hostels_list
+      description: Lists all hostels. Super Admin sees all; Clerks see their own hostel.
       summary: List Hostels
       tags:
       - hostels
@@ -318,10 +821,161 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: List of hostels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Hostel'
+          description: ''
+    post:
+      operationId: hostels_create
+      description: Creates a new hostel. Super Admin only.
+      summary: Create Hostel
+      tags:
+      - hostels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostelCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostel'
+          description: ''
+  /api/v1/hostels/{hostel_id}:
+    get:
+      operationId: hostels_retrieve
+      description: Returns a single hostel by ID.
+      summary: Get Hostel Detail
+      parameters:
+      - in: path
+        name: hostel_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - hostels
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostel'
+          description: ''
+    patch:
+      operationId: hostels_partial_update
+      description: Rename or update hostel. Version check enforced. Super Admin only.
+      summary: Update Hostel
+      parameters:
+      - in: path
+        name: hostel_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - hostels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedHostelUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostel'
+          description: ''
+  /api/v1/hostels/{hostel_id}/deactivate:
+    post:
+      operationId: hostels_deactivate_create
+      description: Deactivate a hostel. Refused if ACTIVE assignments or Clerk exist.
+        Super Admin only.
+      summary: Deactivate Hostel
+      parameters:
+      - in: path
+        name: hostel_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - hostels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostelDeactivateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hostel'
+          description: ''
+  /api/v1/meals/occurrences:
+    get:
+      operationId: meals_occurrences_list
+      description: Lists scheduled meal occurrences scoped by role.
+      summary: List Meal Occurrences
+      tags:
+      - meals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealOccurrence'
+          description: ''
+  /api/v1/meals/occurrences/{occurrence_id}/cancel:
+    post:
+      operationId: meals_occurrences_cancel_create
+      description: Super Admin cancels a scheduled meal occurrence with reason [SPEC
+        DBDD §5].
+      summary: Cancel Meal Occurrence
+      parameters:
+      - in: path
+        name: occurrence_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - meals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealOccurrenceCancelRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealOccurrence'
+          description: ''
   /api/v1/meals/types:
     get:
-      operationId: meals_types_retrieve
+      operationId: meals_types_list
       description: Lists fixed meal types (Breakfast, Lunch, Evening Snacks, Dinner)
         [SPEC DBDD §1].
       summary: List Meal Types
@@ -331,7 +985,13 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: List of meal types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealType'
+          description: ''
   /api/v1/menus:
     get:
       operationId: menus_retrieve
@@ -346,16 +1006,206 @@ paths:
           description: List of menus
   /api/v1/messes:
     get:
-      operationId: messes_retrieve
-      description: Lists all institutional dining mess halls [SPEC SDD §64].
-      summary: List Messes
+      operationId: messes_list
+      description: Lists messes (scoped) or creates a new mess hall (Super Admin only)
+        [SPEC SDD §64].
+      summary: List or Create Messes
       tags:
       - messes
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: List of messes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mess'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mess'
+          description: ''
+    post:
+      operationId: messes_create
+      description: Lists messes (scoped) or creates a new mess hall (Super Admin only)
+        [SPEC SDD §64].
+      summary: List or Create Messes
+      tags:
+      - messes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mess'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mess'
+          description: ''
+  /api/v1/messes/{mess_id}:
+    get:
+      operationId: messes_retrieve
+      description: Retrieve details or update display name with optimistic locking
+        (Super Admin).
+      summary: Get or Update Mess
+      parameters:
+      - in: path
+        name: mess_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - messes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mess'
+          description: ''
+    put:
+      operationId: messes_update
+      description: Retrieve details or update display name with optimistic locking
+        (Super Admin).
+      summary: Get or Update Mess
+      parameters:
+      - in: path
+        name: mess_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - messes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessUpdateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mess'
+          description: ''
+  /api/v1/messes/{mess_id}/deactivate:
+    post:
+      operationId: messes_deactivate_create
+      description: Deactivate a mess hall (Super Admin only). Refused if active assignments
+        exist.
+      summary: Deactivate Mess
+      parameters:
+      - in: path
+        name: mess_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - messes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessDeactivateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mess'
+          description: ''
+  /api/v1/messes/{mess_id}/meal-rates:
+    get:
+      operationId: messes_meal_rates_list
+      description: Super Admin creates new rate version; Super Admin or assigned Manager
+        reads rate history.
+      summary: List or Create Meal Rates
+      parameters:
+      - in: path
+        name: mess_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - messes
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealRate'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealRate'
+          description: ''
+    post:
+      operationId: messes_meal_rates_create
+      description: Super Admin creates new rate version; Super Admin or assigned Manager
+        reads rate history.
+      summary: List or Create Meal Rates
+      parameters:
+      - in: path
+        name: mess_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - messes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealRateCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealRate'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealRate'
+          description: ''
   /api/v1/pauses:
     get:
       operationId: pauses_retrieve
@@ -407,8 +1257,7 @@ paths:
           description: Reports list
   /api/v1/students:
     get:
-      operationId: students_retrieve
-      description: Lists students scoped by user authority [SPEC SDD §64].
+      operationId: students_list
       summary: List Students
       tags:
       - students
@@ -416,7 +1265,351 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudentList'
+          description: ''
+    post:
+      operationId: students_create
+      summary: Create Student
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StudentCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          description: Student created
+  /api/v1/students/{student_id}:
+    get:
+      operationId: students_retrieve
+      summary: Get Student Detail
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDetail'
+          description: ''
+    patch:
+      operationId: students_partial_update
+      summary: Update Student
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedStudentUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDetail'
+          description: ''
+  /api/v1/students/{student_id}/transfer:
+    post:
+      operationId: students_transfer_create
+      description: Creates a new PENDING_VERIFICATION assignment for a different hostel/mess.
+      summary: Transfer Student
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferStudentRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Transfer initiated
+  /api/v1/students/imports:
+    post:
+      operationId: students_imports_create
+      description: Uploads a CSV/XLSX file, parses and validates all rows. Creates
+        a VALIDATED batch.
+      summary: Upload and Validate Import File
+      tags:
+      - students
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+          description: ''
+  /api/v1/students/imports/{batch_id}:
+    get:
+      operationId: students_imports_retrieve
+      description: Returns batch status and counts.
+      summary: Get Import Batch Detail
+      parameters:
+      - in: path
+        name: batch_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+          description: ''
+  /api/v1/students/imports/{batch_id}/cancel:
+    post:
+      operationId: students_imports_cancel_create
+      description: Cancels a STAGED or VALIDATED import batch.
+      summary: Cancel Import Batch
+      parameters:
+      - in: path
+        name: batch_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Batch cancelled
+  /api/v1/students/imports/{batch_id}/commit:
+    post:
+      operationId: students_imports_commit_create
+      description: Uploads a CSV/XLSX, validates, and commits valid rows in one transaction.
+      summary: Commit Import Batch (Upload + Commit)
+      parameters:
+      - in: path
+        name: batch_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Commit result
+  /api/v1/students/imports/{batch_id}/errors:
+    get:
+      operationId: students_imports_errors_list
+      description: Returns validation errors for the batch.
+      summary: Get Import Batch Errors
+      parameters:
+      - in: path
+        name: batch_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImportError'
+          description: ''
+  /api/v1/students/imports/{batch_id}/preview:
+    get:
+      operationId: students_imports_preview_retrieve
+      description: Returns counts, valid rows, and a page of errors.
+      summary: Preview Import Batch
+      parameters:
+      - in: path
+        name: batch_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Batch preview
+  /api/v1/students/me:
+    get:
+      operationId: students_me_retrieve
+      description: Returns the authenticated student's own profile and current assignment.
+      summary: My Profile (Student)
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentMe'
+          description: ''
+  /api/v1/students/verifications:
+    get:
+      operationId: students_verifications_list
+      description: Lists PENDING_VERIFICATION assignments for the Clerk's hostel.
+      summary: List Pending Verifications
+      tags:
+      - students
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingVerification'
+          description: ''
+  /api/v1/students/verifications/{assignment_id}/reject:
+    post:
+      operationId: students_verifications_reject_create
+      description: Rejects a PENDING_VERIFICATION assignment. Goes back to Super Admin.
+      summary: Reject Assignment
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectAssignmentRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Assignment rejected
+  /api/v1/students/verifications/{assignment_id}/verify:
+    post:
+      operationId: students_verifications_verify_create
+      description: Verifies a PENDING_VERIFICATION assignment. Clerk (own hostel)
+        only.
+      summary: Verify Assignment
+      parameters:
+      - in: path
+        name: assignment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyAssignmentRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Assignment verified
+  /api/v1/students/verifications/bulk-reject:
+    post:
+      operationId: students_verifications_bulk_reject_create
+      description: Rejects multiple assignments with per-row result.
+      summary: Bulk Reject Assignments
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkRejectRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Bulk rejection results
+  /api/v1/students/verifications/bulk-verify:
+    post:
+      operationId: students_verifications_bulk_verify_create
+      description: Verifies multiple assignments with per-row result.
+      summary: Bulk Verify Assignments
+      tags:
+      - students
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkVerifyRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Bulk verification results
   /api/v1/upload:
     post:
       operationId: upload_create
@@ -472,6 +1665,142 @@ components:
           description: Mandatory business reason for device revocation
       required:
       - reason
+    ApplicationVersionPolicy:
+      type: object
+      properties:
+        policy_id:
+          type: integer
+          readOnly: true
+        platform:
+          allOf:
+          - $ref: '#/components/schemas/ApplicationVersionPolicyPlatformEnum'
+          description: |-
+            Target platform
+
+            * `ANDROID` - Android
+            * `IOS` - iOS
+            * `WEB` - Web
+        app_version:
+          type: string
+          description: Semantic version string (e.g. '1.0.0')
+          maxLength: 50
+        status:
+          allOf:
+          - $ref: '#/components/schemas/ApplicationVersionPolicyStatusEnum'
+          description: |-
+            Enforcement status
+
+            * `SUPPORTED` - Supported
+            * `DEPRECATED` - Deprecated
+            * `BLOCKED` - Blocked
+        force_update_message:
+          type: string
+          description: Message shown to users when update is required
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - app_version
+      - created_at
+      - platform
+      - policy_id
+      - status
+      - updated_at
+    ApplicationVersionPolicyCreateRequest:
+      type: object
+      properties:
+        platform:
+          $ref: '#/components/schemas/Platform33cEnum'
+        app_version:
+          type: string
+          minLength: 1
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/Status7ffEnum'
+        force_update_message:
+          type: string
+          default: ''
+      required:
+      - app_version
+      - platform
+      - status
+    ApplicationVersionPolicyPlatformEnum:
+      enum:
+      - ANDROID
+      - IOS
+      - WEB
+      type: string
+      description: |-
+        * `ANDROID` - Android
+        * `IOS` - iOS
+        * `WEB` - Web
+    ApplicationVersionPolicyStatusEnum:
+      enum:
+      - SUPPORTED
+      - DEPRECATED
+      - BLOCKED
+      type: string
+      description: |-
+        * `SUPPORTED` - Supported
+        * `DEPRECATED` - Deprecated
+        * `BLOCKED` - Blocked
+    ApplicationVersionPolicyUpdateRequest:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/Status7ffEnum'
+        force_update_message:
+          type: string
+          default: ''
+        version:
+          type: integer
+          description: Optimistic concurrency control version
+      required:
+      - status
+      - version
+    BulkRejectRequest:
+      type: object
+      properties:
+        assignment_ids:
+          type: array
+          items:
+            type: integer
+          description: List of assignment IDs to reject
+          maxItems: 200
+          minItems: 1
+        notes:
+          type: string
+          default: ''
+      required:
+      - assignment_ids
+    BulkVerifyRequest:
+      type: object
+      properties:
+        assignment_ids:
+          type: array
+          items:
+            type: integer
+          description: List of assignment IDs to verify
+          maxItems: 200
+          minItems: 1
+        notes:
+          type: string
+          default: ''
+      required:
+      - assignment_ids
     ChangePasswordRequestRequest:
       type: object
       properties:
@@ -486,6 +1815,196 @@ components:
       required:
       - current_password
       - new_password
+    ClerkCreateRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Clerk's institutional email
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        phone_number:
+          type: string
+          default: ''
+          maxLength: 20
+        hostel_code:
+          type: string
+          minLength: 1
+          description: Hostel to assign the clerk to
+          maxLength: 20
+      required:
+      - email
+      - full_name
+      - hostel_code
+    ClerkReassignRequest:
+      type: object
+      properties:
+        new_hostel_code:
+          type: string
+          minLength: 1
+          description: New hostel code to assign
+          maxLength: 20
+      required:
+      - new_hostel_code
+    ExtraItem:
+      type: object
+      properties:
+        extra_item_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          description: Item display name (e.g. 'Egg Curry')
+          maxLength: 255
+        normalized_name:
+          type: string
+          description: Trimmed and uppercase for uniqueness check [REC]
+          maxLength: 255
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        hostel_name:
+          type: string
+          readOnly: true
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        current_price:
+          type: string
+          nullable: true
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - created_at
+      - current_price
+      - extra_item_id
+      - hostel_code
+      - hostel_id
+      - hostel_name
+      - name
+      - normalized_name
+      - updated_at
+    ExtraItemCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Item display name (e.g. 'Egg Curry')
+          maxLength: 255
+        hostel_code:
+          type: string
+          default: ''
+          description: Hostel code (required for Super Admin, inferred for Clerk)
+          maxLength: 20
+        initial_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Optional starting unit price
+        effective_from:
+          type: string
+          format: date
+          description: Optional effective start date for initial price (default today)
+      required:
+      - name
+    ExtraItemDeactivateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          description: Optimistic concurrency version counter
+      required:
+      - version
+    ExtraItemUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        version:
+          type: integer
+          description: Optimistic concurrency version counter
+      required:
+      - name
+      - version
+    ExtraPrice:
+      type: object
+      properties:
+        extra_price_id:
+          type: integer
+          readOnly: true
+        extra_item_id:
+          type: integer
+          readOnly: true
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        effective_from:
+          type: string
+          format: date
+          description: Start date of price (inclusive)
+        effective_to:
+          type: string
+          format: date
+          nullable: true
+          description: End date of price (inclusive, null=open-ended)
+        created_by_id:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+      required:
+      - created_at
+      - created_by_id
+      - effective_from
+      - extra_item_id
+      - extra_price_id
+      - unit_price
+    ExtraPriceCreateRequest:
+      type: object
+      properties:
+        unit_price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        effective_from:
+          type: string
+          format: date
+          description: Start date (inclusive, must be >= today)
+        reason:
+          type: string
+          default: ''
+      required:
+      - effective_from
+      - unit_price
     ForgotPasswordRequestRequest:
       type: object
       properties:
@@ -496,6 +2015,156 @@ components:
           description: Account email address
       required:
       - email
+    Hostel:
+      type: object
+      properties:
+        hostel_id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          description: Short hostel code
+          maxLength: 20
+        name:
+          type: string
+          description: Hostel display name
+          maxLength: 255
+        address:
+          type: string
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - code
+      - created_at
+      - hostel_id
+      - name
+      - updated_at
+    HostelCreateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: Short unique hostel code
+          maxLength: 20
+        name:
+          type: string
+          minLength: 1
+          description: Hostel display name
+          maxLength: 255
+        address:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - code
+      - name
+    HostelDeactivateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          description: Optimistic concurrency version
+      required:
+      - version
+    ImportBatch:
+      type: object
+      properties:
+        batch_id:
+          type: integer
+          readOnly: true
+        file_name:
+          type: string
+          maxLength: 255
+        total_rows:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        successful_rows:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        failed_rows:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        status:
+          $ref: '#/components/schemas/ImportBatchStatusEnum'
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - batch_id
+      - created_at
+      - file_name
+      - updated_at
+    ImportBatchStatusEnum:
+      enum:
+      - STAGED
+      - VALIDATED
+      - COMMITTED
+      - FAILED
+      - CANCELLED
+      type: string
+      description: |-
+        * `STAGED` - Staged
+        * `VALIDATED` - Validated
+        * `COMMITTED` - Committed
+        * `FAILED` - Failed
+        * `CANCELLED` - Cancelled
+    ImportError:
+      type: object
+      properties:
+        error_id:
+          type: integer
+          readOnly: true
+        row_number:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        roll_number:
+          type: string
+          maxLength: 50
+        error_message:
+          type: string
+        raw_row_data:
+          description: Raw row content as JSON for debugging
+      required:
+      - error_id
+      - error_message
+      - raw_row_data
+      - row_number
     LoginRequestRequest:
       type: object
       properties:
@@ -515,7 +2184,7 @@ components:
           maxLength: 255
         platform:
           allOf:
-          - $ref: '#/components/schemas/PlatformEnum'
+          - $ref: '#/components/schemas/Platform33cEnum'
           description: |-
             Client platform
 
@@ -535,7 +2204,437 @@ components:
       - email
       - password
       - platform
-    PlatformEnum:
+    MealOccurrence:
+      type: object
+      properties:
+        meal_occurrence_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        mess_name:
+          type: string
+          readOnly: true
+        meal_type_id:
+          type: integer
+          readOnly: true
+        meal_type_code:
+          type: string
+          readOnly: true
+        meal_type_name:
+          type: string
+          readOnly: true
+        meal_date:
+          type: string
+          format: date
+          description: Scheduled calendar date (IST)
+        status:
+          $ref: '#/components/schemas/MealOccurrenceStatusEnum'
+        configuration_version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Tracks menu/time configuration changes
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - created_at
+      - meal_date
+      - meal_occurrence_id
+      - meal_type_code
+      - meal_type_id
+      - meal_type_name
+      - mess_code
+      - mess_id
+      - mess_name
+      - updated_at
+    MealOccurrenceCancelRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          description: Required explanation for cancelling scheduled occurrence
+          maxLength: 500
+      required:
+      - reason
+    MealOccurrenceStatusEnum:
+      enum:
+      - SCHEDULED
+      - CANCELLED
+      type: string
+      description: |-
+        * `SCHEDULED` - Scheduled
+        * `CANCELLED` - Cancelled
+    MealRate:
+      type: object
+      properties:
+        meal_rate_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Common diet rate per meal [DEC-04]
+        effective_from:
+          type: string
+          format: date
+          description: Start date of rate (inclusive)
+        effective_to:
+          type: string
+          format: date
+          nullable: true
+          description: End date of rate (inclusive, null=open-ended)
+        created_by_id:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+      required:
+      - created_at
+      - created_by_id
+      - effective_from
+      - meal_rate_id
+      - mess_code
+      - mess_id
+      - rate
+    MealRateCreateRequest:
+      type: object
+      properties:
+        rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        effective_from:
+          type: string
+          format: date
+          description: Start date (inclusive, must be >= today)
+        reason:
+          type: string
+          default: ''
+      required:
+      - effective_from
+      - rate
+    MealType:
+      type: object
+      properties:
+        meal_type_id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          description: BREAKFAST, LUNCH, EVENING_SNACKS, DINNER
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 100
+        sequence_no:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: 'Display/chronological ordering: 1, 2, 3, 4'
+        is_fixed:
+          type: boolean
+        is_active:
+          type: boolean
+      required:
+      - code
+      - meal_type_id
+      - name
+      - sequence_no
+    Mess:
+      type: object
+      properties:
+        mess_id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          description: Short mess identifier
+          maxLength: 20
+        name:
+          type: string
+          description: Mess hall display name
+          maxLength: 255
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - code
+      - created_at
+      - mess_id
+      - name
+      - updated_at
+    MessCreateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: Short unique mess identifier (e.g. 'M1')
+          maxLength: 20
+        name:
+          type: string
+          minLength: 1
+          description: Mess hall display name
+          maxLength: 255
+      required:
+      - code
+      - name
+    MessDeactivateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          description: Optimistic concurrency version counter
+      required:
+      - version
+    MessManagerAssignment:
+      type: object
+      properties:
+        assignment_id:
+          type: integer
+          readOnly: true
+        user_id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        phone_number:
+          type: string
+          readOnly: true
+        mess:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+        assigned_at:
+          type: string
+          format: date-time
+          description: When the manager was assigned
+        deactivated_at:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - assigned_at
+      - assignment_id
+      - email
+      - full_name
+      - mess
+      - phone_number
+      - user_id
+    MessManagerCreateRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Staff institutional email
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mess_code:
+          type: string
+          minLength: 1
+          maxLength: 20
+        phone_number:
+          type: string
+          default: ''
+          maxLength: 20
+      required:
+      - email
+      - full_name
+      - mess_code
+    MessManagerReassignRequest:
+      type: object
+      properties:
+        new_mess_code:
+          type: string
+          minLength: 1
+          description: Target mess code
+          maxLength: 20
+      required:
+      - new_mess_code
+    MessUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Updated display name
+          maxLength: 255
+        version:
+          type: integer
+          description: Optimistic concurrency version counter
+      required:
+      - name
+      - version
+    PatchedHostelUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        address:
+          type: string
+          maxLength: 1000
+        version:
+          type: integer
+          description: Optimistic concurrency version
+    PatchedStudentUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        department:
+          type: string
+          maxLength: 255
+        year_of_study:
+          type: integer
+          nullable: true
+        room_number:
+          type: string
+          maxLength: 50
+        phone_number:
+          type: string
+          maxLength: 20
+        status:
+          $ref: '#/components/schemas/StudentUpdateStatusEnum'
+        version:
+          type: integer
+          description: Optimistic concurrency version
+    PendingVerification:
+      type: object
+      description: Serializer for pending verification assignments as seen by the
+        Clerk.
+      properties:
+        assignment_id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        student:
+          type: string
+          readOnly: true
+        roll_number:
+          type: string
+          readOnly: true
+        student_name:
+          type: string
+          readOnly: true
+        student_email:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        mess_name:
+          type: string
+          readOnly: true
+        effective_from:
+          type: string
+          format: date
+          description: Start date of assignment (IST calendar)
+        status:
+          $ref: '#/components/schemas/PendingVerificationStatusEnum'
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+      required:
+      - assignment_id
+      - created_at
+      - effective_from
+      - hostel_code
+      - hostel_id
+      - mess_code
+      - mess_id
+      - mess_name
+      - roll_number
+      - student
+      - student_email
+      - student_id
+      - student_name
+    PendingVerificationStatusEnum:
+      enum:
+      - PENDING_VERIFICATION
+      - ACTIVE
+      - ENDED
+      - REJECTED
+      type: string
+      description: |-
+        * `PENDING_VERIFICATION` - Pending Verification
+        * `ACTIVE` - Active
+        * `ENDED` - Ended
+        * `REJECTED` - Rejected
+    Platform33cEnum:
       enum:
       - ANDROID
       - IOS
@@ -554,6 +2653,12 @@ components:
           description: 256-bit opaque refresh token
       required:
       - refresh
+    RejectAssignmentRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          default: ''
     ResetPasswordRequestRequest:
       type: object
       properties:
@@ -574,6 +2679,323 @@ components:
       - email
       - new_password
       - otp
+    Status372Enum:
+      enum:
+      - ACTIVE
+      - INACTIVE
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `INACTIVE` - Inactive
+    Status7ffEnum:
+      enum:
+      - SUPPORTED
+      - DEPRECATED
+      - BLOCKED
+      type: string
+      description: |-
+        * `SUPPORTED` - SUPPORTED
+        * `DEPRECATED` - DEPRECATED
+        * `BLOCKED` - BLOCKED
+    StudentCreateRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Institutional college email
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 150
+        roll_number:
+          type: string
+          minLength: 1
+          maxLength: 50
+        hostel_code:
+          type: string
+          minLength: 1
+          description: Active hostel code
+          maxLength: 20
+        mess_code:
+          type: string
+          minLength: 1
+          description: Active mess code
+          maxLength: 20
+        department:
+          type: string
+          default: ''
+          maxLength: 255
+        year_of_study:
+          type: integer
+          nullable: true
+        room_number:
+          type: string
+          default: ''
+          maxLength: 50
+        phone_number:
+          type: string
+          default: ''
+          maxLength: 20
+        effective_from:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - email
+      - full_name
+      - hostel_code
+      - mess_code
+      - roll_number
+    StudentDetail:
+      type: object
+      properties:
+        student_id:
+          type: integer
+          readOnly: true
+        user_id:
+          type: integer
+          readOnly: true
+        roll_number:
+          type: string
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        phone_number:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        hostel_name:
+          type: string
+          readOnly: true
+        department:
+          type: string
+          maxLength: 255
+        year_of_study:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        room_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+        current_assignment:
+          type: string
+          readOnly: true
+      required:
+      - created_at
+      - current_assignment
+      - email
+      - full_name
+      - hostel_code
+      - hostel_id
+      - hostel_name
+      - phone_number
+      - roll_number
+      - student_id
+      - updated_at
+      - user_id
+    StudentList:
+      type: object
+      properties:
+        student_id:
+          type: integer
+          readOnly: true
+        roll_number:
+          type: string
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        hostel_name:
+          type: string
+          readOnly: true
+        department:
+          type: string
+          maxLength: 255
+        year_of_study:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        room_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was last updated (UTC)
+      required:
+      - created_at
+      - email
+      - full_name
+      - hostel_code
+      - hostel_id
+      - hostel_name
+      - roll_number
+      - student_id
+      - updated_at
+    StudentMe:
+      type: object
+      description: Read-only profile for the authenticated student.
+      properties:
+        student_id:
+          type: integer
+          readOnly: true
+        roll_number:
+          type: string
+          maxLength: 50
+        email:
+          type: string
+          format: email
+          readOnly: true
+        full_name:
+          type: string
+          readOnly: true
+        phone_number:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        hostel_name:
+          type: string
+          readOnly: true
+        department:
+          type: string
+          maxLength: 255
+        year_of_study:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          nullable: true
+        room_number:
+          type: string
+          maxLength: 50
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        current_assignment:
+          type: string
+          readOnly: true
+      required:
+      - current_assignment
+      - email
+      - full_name
+      - hostel_code
+      - hostel_id
+      - hostel_name
+      - phone_number
+      - roll_number
+      - student_id
+    StudentUpdateStatusEnum:
+      enum:
+      - ACTIVE
+      - INACTIVE
+      type: string
+      description: |-
+        * `ACTIVE` - ACTIVE
+        * `INACTIVE` - INACTIVE
+    SystemSettingUpdateRequest:
+      type: object
+      properties:
+        key:
+          type: string
+          minLength: 1
+          description: Dot-notated setting key
+          maxLength: 255
+        value:
+          type: string
+          minLength: 1
+          description: New string value for setting
+        reason:
+          type: string
+          default: ''
+          description: Audit explanation for change
+          maxLength: 500
+      required:
+      - key
+      - value
+    TransferStudentRequest:
+      type: object
+      properties:
+        new_hostel_code:
+          type: string
+          minLength: 1
+          description: Target hostel code
+          maxLength: 20
+        new_mess_code:
+          type: string
+          minLength: 1
+          description: Target mess code
+          maxLength: 20
+        effective_from:
+          type: string
+          format: date
+          description: Transfer effective date
+        reason:
+          type: string
+          default: ''
+          maxLength: 500
+      required:
+      - effective_from
+      - new_hostel_code
+      - new_mess_code
     UpdateDeviceMetadataRequest:
       type: object
       properties:
@@ -584,7 +3006,13 @@ components:
           type: string
           maxLength: 255
         platform:
-          $ref: '#/components/schemas/PlatformEnum'
+          $ref: '#/components/schemas/Platform33cEnum'
+    VerifyAssignmentRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+          default: ''
     VerifyOtpRequestRequest:
       type: object
       properties:

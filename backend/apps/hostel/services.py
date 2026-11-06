@@ -59,7 +59,7 @@ def normalize_roll_number(roll_number: str) -> str:
     if ROLL_NUMBER_FORBIDDEN_RE.search(cleaned):
         raise ValidationError(
             code="VALIDATION_ERROR",
-            message="Roll number must not contain the '|' character (reserved for QR payload).",
+            message="Roll number must not contain the '|' (pipe) character (reserved for QR payload).",
         )
     if not cleaned:
         raise ValidationError(
@@ -439,8 +439,10 @@ def _parse_xlsx(file_content: bytes) -> list[dict[str, str]]:
 
 
 def _validate_email_domain(email: str) -> bool:
-    """Basic email format check."""
-    return bool(re.match(r"^[^@]+@[^@]+\.[^@]+$", email))
+    """Validate college email domain [SPEC SDD §97]."""
+    if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+        return False
+    return email.endswith("@college.edu")
 
 
 def _validate_import_row(
@@ -1090,7 +1092,7 @@ def bulk_verify_assignments(
             )
             results.append({
                 "assignment_id": aid,
-                "status": "VERIFIED",
+                "status": "SUCCESS",
                 "student_id": assignment.student_id,
             })
         except (NotFoundError, ValidationError, ConflictError) as e:
@@ -1122,7 +1124,7 @@ def bulk_reject_assignments(
             )
             results.append({
                 "assignment_id": aid,
-                "status": "REJECTED",
+                "status": "SUCCESS",
                 "student_id": assignment.student_id,
             })
         except (NotFoundError, ValidationError, ConflictError) as e:
@@ -1317,6 +1319,7 @@ def reassign_hostel_clerk(
         "hostel": {"id": new_hostel.hostel_id, "code": new_hostel.code, "name": new_hostel.name},
         "assignment_id": assignment.clerk_assignment_id,
         "is_active": True,
+        "new_hostel_code": new_hostel.code,
     }
 
 

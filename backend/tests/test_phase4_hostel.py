@@ -161,6 +161,7 @@ def clerk_user(db, setup_roles, hostel_a):
         user=user,
         hostel=hostel_a,
         is_active=True,
+        assigned_at=clock.now(),
     )
     return user
 
@@ -177,18 +178,21 @@ def clerk_b_user(db, setup_roles, hostel_b):
         user=user,
         hostel=hostel_b,
         is_active=True,
+        assigned_at=clock.now(),
     )
     return user
 
 
 def auth_client(client, user, role_name):
-    device = DeviceRegistration.objects.create(
-        user=user,
-        device_id=f"dev-{user.user_id}",
-        platform="WEB",
-        session_status="ACTIVE",
-        registered_at=clock.now(),
-    )
+    device = DeviceRegistration.objects.filter(user=user, session_status="ACTIVE").first()
+    if not device:
+        device = DeviceRegistration.objects.create(
+            user=user,
+            device_id=f"dev-{user.user_id}",
+            platform="WEB",
+            session_status="ACTIVE",
+            registered_at=clock.now(),
+        )
     token = generate_access_token(user, role_name, device)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client

@@ -51,16 +51,28 @@ class StudentAssignmentSerializer(serializers.ModelSerializer):
     mess_name = serializers.CharField(source="mess.name", read_only=True)
     hostel_code = serializers.CharField(source="hostel.code", read_only=True)
     hostel_name = serializers.CharField(source="hostel.name", read_only=True)
+    mess = serializers.SerializerMethodField()
+    hostel = serializers.SerializerMethodField()
 
     class Meta:
         model = StudentMessAssignment
         fields = [
             "assignment_id", "status", "effective_from", "effective_to",
-            "mess_id", "mess_code", "mess_name",
-            "hostel_id", "hostel_code", "hostel_name",
+            "mess_id", "mess_code", "mess_name", "mess",
+            "hostel_id", "hostel_code", "hostel_name", "hostel",
             "verified_by_id", "verified_at", "rejection_reason",
             "version", "created_at", "updated_at",
         ]
+
+    def get_mess(self, obj):
+        if obj.mess:
+            return {"id": obj.mess.mess_id, "code": obj.mess.code, "name": obj.mess.name}
+        return None
+
+    def get_hostel(self, obj):
+        if obj.hostel:
+            return {"id": obj.hostel.hostel_id, "code": obj.hostel.code, "name": obj.hostel.name}
+        return None
 
 
 class StudentListSerializer(serializers.ModelSerializer):
@@ -206,6 +218,7 @@ class PendingVerificationSerializer(serializers.ModelSerializer):
     roll_number = serializers.CharField(source="student.roll_number", read_only=True)
     student_name = serializers.CharField(source="student.user.full_name", read_only=True)
     student_email = serializers.CharField(source="student.user.email", read_only=True)
+    student = serializers.SerializerMethodField()
     mess_code = serializers.CharField(source="mess.code", read_only=True)
     mess_name = serializers.CharField(source="mess.name", read_only=True)
     hostel_code = serializers.CharField(source="hostel.code", read_only=True)
@@ -213,10 +226,18 @@ class PendingVerificationSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentMessAssignment
         fields = [
-            "assignment_id", "student_id", "roll_number", "student_name", "student_email",
+            "assignment_id", "student_id", "student", "roll_number", "student_name", "student_email",
             "hostel_id", "hostel_code", "mess_id", "mess_code", "mess_name",
             "effective_from", "status", "created_at",
         ]
+
+    def get_student(self, obj):
+        return {
+            "student_id": obj.student.student_id,
+            "roll_number": obj.student.roll_number,
+            "full_name": obj.student.user.full_name,
+            "email": obj.student.user.email,
+        }
 
 
 class VerifyAssignmentSerializer(serializers.Serializer):
