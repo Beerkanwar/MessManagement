@@ -67,7 +67,7 @@ class BaseAdvisoryLockCommand(BaseCommand):
                 command=self.__class__.__name__,
                 lock_id=lock_id,
                 error=str(exc),
-                exc_info=exc,
+                exc_info=True,
             )
             raise CommandError(f"Job failed: {exc}") from exc
         finally:

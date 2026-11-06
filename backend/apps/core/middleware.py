@@ -62,7 +62,13 @@ class RequestLoggingMiddleware:
 
         duration_ms = round((clock.monotonic() - start_time) * 1000, 2)
         trace_id = getattr(request, "trace_id", "")
-        device_id = request.headers.get("X-Device-Id")
+        # Authenticated device binding takes precedence; sanitize client header fallback (ISSUE-14)
+        device_id = getattr(getattr(request, "device", None), "device_id", None)
+        if not device_id:
+            raw_header = request.headers.get("X-Device-Id")
+            if raw_header:
+                sanitized = "".join(c for c in raw_header if c.isalnum() or c in "-_.:")[:64]
+                device_id = sanitized or None
 
         user_id = None
         if hasattr(request, "user") and request.user.is_authenticated:

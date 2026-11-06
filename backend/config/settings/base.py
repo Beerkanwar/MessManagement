@@ -19,7 +19,7 @@ elif (BASE_DIR.parent / ".env").exists():
 # Security & Core
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-mess-management-phase1-dev-key-change-in-prod")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "testserver"])
 
 # Student secret encryption keys (AES-256-GCM) [SPEC SDD §63, ImplementationGuide Phase 6]
 # Format: key_id (int) -> 32-byte hex key or bytes. First entry encrypts, all decrypt.
@@ -192,12 +192,20 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
 # Security behind reverse proxy
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Email Configuration (ISSUE-12)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@hostel-mess.college.edu")
+
 # CORS Settings (Web origin only; mobile needs no CORS) [ImplementationGuide Phase 1]
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5173"],
 )
 CORS_ALLOW_CREDENTIALS = True
+
+# Security invariant (ISSUE-07): Prevent wildcard origins when credentials are permitted
+if CORS_ALLOW_CREDENTIALS and "*" in CORS_ALLOWED_ORIGINS:
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("CORS_ALLOW_CREDENTIALS cannot be enabled when '*' is in CORS_ALLOWED_ORIGINS.")
 
 # SimpleJWT Configuration [SPEC SDD §11.1, §100, DEC-10]
 SIMPLE_JWT = {

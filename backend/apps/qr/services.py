@@ -22,21 +22,7 @@ from apps.qr.crypto import SecretEncryptionService
 from apps.sync.models import ChangeCursor
 
 
-def advance_change_cursor(cursor_key: str) -> int:
-    """
-    Advance the change cursor for the given aggregate key (e.g. 'mess:<id>:secrets').
-    Returns the new version number [SPEC DBDD §11].
-    """
-    obj, created = ChangeCursor.objects.get_or_create(
-        aggregate_type=cursor_key,
-        defaults={"current_version": 1},
-    )
-    if not created:
-        ChangeCursor.objects.filter(cursor_id=obj.cursor_id).update(
-            current_version=models.F("current_version") + 1
-        )
-        obj.refresh_from_db()
-    return obj.current_version
+from apps.sync.services import advance_change_cursor
 
 
 def generate_student_secret_bytes() -> bytes:

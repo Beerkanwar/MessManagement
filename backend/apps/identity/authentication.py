@@ -124,6 +124,11 @@ class DeviceBindingJWTAuthentication(authentication.BaseAuthentication):
         # Attach device to request
         request.device = device
 
+        # Cache role from verified JWT payload onto the user instance (ISSUE-09)
+        token_role = payload.get("role")
+        if token_role:
+            user._cached_role = token_role
+
         # Bind user and device context to structlog
         structlog.contextvars.bind_contextvars(
             user_id=str(user.user_id),

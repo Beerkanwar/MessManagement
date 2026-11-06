@@ -6,7 +6,7 @@ from .base import env
 
 DEBUG = True
 
-ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "*"])
+ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1", "0.0.0.0", "testserver"])
 
 # Dev email backend: Mailpit running in Docker Compose
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

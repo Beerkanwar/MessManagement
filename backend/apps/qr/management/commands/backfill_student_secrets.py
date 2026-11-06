@@ -3,15 +3,15 @@ Management command to backfill student secrets for all active students lacking a
 [ImplementationGuide Phase 4 & Phase 6 requirement]
 Idempotent: safe to run multiple times.
 """
-from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from apps.core.management.commands.base import BaseAdvisoryLockCommand
 from apps.hostel.models import Student
 from apps.identity.models import StudentSecret
 from apps.qr.services import provision_student_secret
 
 
-class Command(BaseCommand):
+class Command(BaseAdvisoryLockCommand):
     help = "Idempotently provisions QR secrets for active students lacking an active secret [Phase 6]."
 
     def add_arguments(self, parser):
@@ -21,7 +21,7 @@ class Command(BaseCommand):
             help="Show how many secrets would be provisioned without committing to the database.",
         )
 
-    def handle(self, *args, **options):
+    def handle_locked(self, *args, **options):
         dry_run = options.get("dry_run", False)
 
         all_active_students = Student.objects.filter(status="ACTIVE")

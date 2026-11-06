@@ -17,16 +17,24 @@ def get_user_role(user: User) -> str | None:
     """
     Returns the user's single primary role name (DEC-20).
     If user is marked superuser and lacks a UserRole entry, returns 'SUPER_ADMIN'.
+    Caches the resolved role on the in-memory user instance to eliminate N+1 queries (ISSUE-09).
     """
     if not user or not user.is_authenticated:
         return None
 
+    if hasattr(user, "_cached_role"):
+        return user._cached_role
+
     ur = UserRole.objects.select_related("role").filter(user=user).first()
     if ur:
-        return ur.role.name
-    if getattr(user, "is_superuser", False):
-        return "SUPER_ADMIN"
-    return None
+        role_name = ur.role.name
+    elif getattr(user, "is_superuser", False):
+        role_name = "SUPER_ADMIN"
+    else:
+        role_name = None
+
+    user._cached_role = role_name
+    return role_name
 
 
 def get_clerk_hostel(user: User) -> Hostel | None:

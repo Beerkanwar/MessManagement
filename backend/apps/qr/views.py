@@ -61,6 +61,11 @@ def qr_secret_view(request):
     Delivers the active 32-byte secret key material to the student's mobile app over HTTPS.
     Single decryption point [ImplementationGuide Phase 6 requirement 2].
     """
+    # Enforce HTTPS in production environments (ISSUE-11)
+    from django.conf import settings
+    if not request.is_secure() and not settings.DEBUG and not getattr(settings, "TESTING", False):
+        raise PermissionDenied("HTTPS is strictly required for QR secret delivery.")
+
     # Enforce active device registration
     device = getattr(request, "device", None)
     if device is not None and getattr(device, "session_status", "ACTIVE") != "ACTIVE":

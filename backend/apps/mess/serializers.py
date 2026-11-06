@@ -175,6 +175,12 @@ class MealRateCreateSerializer(serializers.Serializer):
     effective_from = serializers.DateField(help_text="Start date (inclusive, must be >= today)")
     reason = serializers.CharField(required=False, allow_blank=True, default="")
 
+    def validate_effective_from(self, value):
+        from apps.core.clock import clock
+        if value < clock.today():
+            raise serializers.ValidationError("Effective from date cannot be in the past.")
+        return value
+
 
 # ---------------------------------------------------------------------------
 # Extra Items & Prices Serializers
@@ -199,6 +205,12 @@ class ExtraPriceCreateSerializer(serializers.Serializer):
     unit_price = serializers.DecimalField(max_digits=19, decimal_places=4, min_value=Decimal("0.0000"))
     effective_from = serializers.DateField(help_text="Start date (inclusive, must be >= today)")
     reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+    def validate_effective_from(self, value):
+        from apps.core.clock import clock
+        if value < clock.today():
+            raise serializers.ValidationError("Effective from date cannot be in the past.")
+        return value
 
 
 class ExtraItemSerializer(serializers.ModelSerializer):

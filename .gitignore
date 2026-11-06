@@ -25,5 +25,7 @@ Thumbs.db
 .idea/
 
 
-#Doc
+# Transient Docs / Audit Outputs
 ImplementationGuide.md
+file_list.txt
+AuditReport.md

@@ -5,13 +5,19 @@ Enforces SDD §63 and SDD §103 invariants.
 from typing import Any, Mapping
 
 # Denylist for sensitive keys per SPEC SDD §63
+# Note: Replaced bare "key" substring with precise matching to prevent false positives (ISSUE-05).
 SENSITIVE_KEY_SUBSTRINGS = (
     "password",
     "otp",
     "token",
     "authorization",
     "secret",
-    "key",
+    "private_key",
+    "signing_key",
+    "encryption_key",
+    "api_key",
+    "client_key",
+    "secret_key",
     "qr",
     "payload",
 )
@@ -19,12 +25,23 @@ SENSITIVE_KEY_SUBSTRINGS = (
 REDACTED_PLACEHOLDER = "[REDACTED]"
 
 
+def is_sensitive_key(key: str) -> bool:
+    """
+    Checks if a key name corresponds to sensitive credential material.
+    Avoids false-positive redaction/rejection for generic structural identifiers (ISSUE-05).
+    """
+    lower_key = str(key).lower().strip()
+    if lower_key == "key" or lower_key.endswith("_key") or lower_key.endswith("-key"):
+        # Exclude innocent DB structural identifiers
+        if lower_key not in ("foreign_key", "primary_key", "entity_key", "partition_key", "cache_key"):
+            return True
+    return any(sub in lower_key for sub in SENSITIVE_KEY_SUBSTRINGS)
+
+
 def mask_sensitive_value(key: str, value: Any) -> Any:
     """Recursively mask values whose key contains sensitive keywords."""
-    lower_key = key.lower()
-    for sensitive_sub in SENSITIVE_KEY_SUBSTRINGS:
-        if sensitive_sub in lower_key:
-            return REDACTED_PLACEHOLDER
+    if is_sensitive_key(key):
+        return REDACTED_PLACEHOLDER
 
     if isinstance(value, dict):
         return {k: mask_sensitive_value(k, v) for k, v in value.items()}

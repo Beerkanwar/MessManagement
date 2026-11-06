@@ -41,21 +41,7 @@ from apps.sync.models import ChangeCursor
 # ---------------------------------------------------------------------------
 
 
-def advance_change_cursor(cursor_key: str) -> int:
-    """
-    Advance the change cursor for the given aggregate key.
-    Returns the new version number.
-    """
-    obj, created = ChangeCursor.objects.get_or_create(
-        aggregate_type=cursor_key,
-        defaults={"current_version": 1},
-    )
-    if not created:
-        ChangeCursor.objects.filter(cursor_id=obj.cursor_id).update(
-            current_version=F("current_version") + 1
-        )
-        obj.refresh_from_db()
-    return obj.current_version
+from apps.sync.services import advance_change_cursor
 
 
 # ---------------------------------------------------------------------------

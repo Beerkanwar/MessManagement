@@ -150,7 +150,7 @@ def custom_exception_handler(exc: Exception, context: dict[str, Any]) -> Respons
         "unhandled_server_exception",
         trace_id=trace_id,
         error_type=type(exc).__name__,
-        exc_info=exc,
+        exc_info=True,
         path=request.path if request else "unknown",
         method=request.method if request else "unknown",
     )

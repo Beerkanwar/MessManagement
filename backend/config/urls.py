@@ -1,6 +1,12 @@
 """
 Root URL configuration for Hostel Mess Management System.
 Enforces SPEC SDD §64 (/api/v1/ versioned prefix) and SPEC SDD §105 (unversioned health probes).
+
+API Versioning & Deprecation Policy (ISSUE-22):
+- All operational endpoints are partitioned under `/api/v1/` to guarantee deterministic contracts.
+- Any future breaking changes must be introduced under a new version prefix (e.g., `/api/v2/`).
+- Deprecated endpoints must announce deprecation via RFC 8594 `Sunset` and `Deprecation` response headers,
+  maintaining backward compatibility for a minimum 6-month deprecation lifecycle prior to decommission.
 """
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView

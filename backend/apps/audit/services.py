@@ -7,7 +7,7 @@ from typing import Any
 from django.core.exceptions import ValidationError
 from apps.audit.models import AuditLog
 from apps.core.clock import clock
-from apps.core.logging import SENSITIVE_KEY_SUBSTRINGS
+from apps.core.logging import SENSITIVE_KEY_SUBSTRINGS, is_sensitive_key
 
 MAX_AUDIT_STRING_LENGTH = 500
 
@@ -24,12 +24,10 @@ def sanitize_audit_payload(data: Any) -> Any:
     if isinstance(data, dict):
         sanitized = {}
         for key, value in data.items():
-            lower_key = str(key).lower()
-            for sensitive_term in SENSITIVE_KEY_SUBSTRINGS:
-                if sensitive_term in lower_key:
-                    raise ValidationError(
-                        f"Audit payload contains prohibited sensitive key: '{key}' [SPEC SDD §63]"
-                    )
+            if is_sensitive_key(str(key)):
+                raise ValidationError(
+                    f"Audit payload contains prohibited sensitive key: '{key}' [SPEC SDD §63]"
+                )
             sanitized[key] = sanitize_audit_payload(value)
         return sanitized
 
