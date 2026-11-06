@@ -5,6 +5,7 @@ Enforces SPEC SDD §64, Appendix A, and ImplementationGuide Phase 4.
 """
 from django.urls import path
 from apps.hostel import views
+from apps.qr import views as qr_views
 
 urlpatterns = [
     # Hostels [SPEC SDD §64, ImplementationGuide Phase 4]
@@ -17,9 +18,10 @@ urlpatterns = [
     path("admin/hostel-clerks/<int:user_id>/reassign", views.clerk_reassign_view, name="clerk_reassign"),
     path("admin/hostel-clerks/<int:user_id>/deactivate", views.clerk_deactivate_view, name="clerk_deactivate"),
 
-    # Students [SPEC SDD §64, ImplementationGuide Phase 4]
+    # Students [SPEC SDD §64, ImplementationGuide Phase 4 & Phase 6]
     path("students", views.student_list_create_view, name="students_list_create"),
     path("students/me", views.student_me_view, name="student_me"),
+    path("students/me/secret", qr_views.qr_secret_view, name="student_me_secret"),
     path("students/<int:student_id>", views.student_detail_update_view, name="student_detail_update"),
     path("students/<int:student_id>/transfer", views.student_transfer_view, name="student_transfer"),
 

@@ -21,6 +21,12 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="django-insecure-mess-management-p
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
+# Student secret encryption keys (AES-256-GCM) [SPEC SDD §63, ImplementationGuide Phase 6]
+# Format: key_id (int) -> 32-byte hex key or bytes. First entry encrypts, all decrypt.
+SECRET_ENCRYPTION_KEYS = {
+    1: env("QR_SECRET_ENCRYPTION_KEY", default="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+}
+
 # Time & Localization (DEC-01)
 # Server TIME_ZONE = Asia/Kolkata (no DST); timestamps stored UTC in timestamptz
 TIME_ZONE = "Asia/Kolkata"
@@ -173,6 +179,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100/minute",
         "user": "1000/minute",
+        "qr_secret": "60/minute",
     },
     # drf-spectacular schema generator
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",

@@ -1,0 +1,269 @@
+{
+  "protocol": "HMAC-SHA256-TOTP-v1",
+  "step_seconds": 30,
+  "window_steps": 1,
+  "awkward_case_vectors": [
+    {
+      "description": "Awkward case: Unix time 0 (epoch start)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 0,
+      "step": 30,
+      "counter": 0,
+      "counter_bytes": "0000000000000000",
+      "hmac": "785672f2024dab4371b6e8e1254ab247a43c96410781981d7e3a264109c1cec3",
+      "offset": 3,
+      "top_bit_was_set": true,
+      "truncated": 1912753579,
+      "code": "753579"
+    },
+    {
+      "description": "Awkward case: Last second of step 0 (t = 29s)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 29,
+      "step": 30,
+      "counter": 0,
+      "counter_bytes": "0000000000000000",
+      "hmac": "785672f2024dab4371b6e8e1254ab247a43c96410781981d7e3a264109c1cec3",
+      "offset": 3,
+      "top_bit_was_set": true,
+      "truncated": 1912753579,
+      "code": "753579"
+    },
+    {
+      "description": "Awkward case: First second of step 1 (t = 30s)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 30,
+      "step": 30,
+      "counter": 1,
+      "counter_bytes": "0000000000000001",
+      "hmac": "4c556a14b7f73ffb923e8d29186ff33d82242d8781872a7c55f447a61af02595",
+      "offset": 5,
+      "top_bit_was_set": true,
+      "truncated": 2000681874,
+      "code": "681874"
+    },
+    {
+      "description": "Awkward case: Offset 0 (starts at first byte of HMAC)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 180,
+      "step": 30,
+      "counter": 6,
+      "counter_bytes": "0000000000000006",
+      "hmac": "7b48d0f550997fc18ad6b07cee1de022f72da9297e10a3810486f46f76fa2c60",
+      "offset": 0,
+      "top_bit_was_set": false,
+      "truncated": 2068369653,
+      "code": "369653"
+    },
+    {
+      "description": "Awkward case: Offset 15 (starts at byte 15, spans to byte 19)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 1080,
+      "step": 30,
+      "counter": 36,
+      "counter_bytes": "0000000000000024",
+      "hmac": "1af147a1d4867d81eed36e79389270723190a78af1fbc66b1e9f8005f9ae31ff",
+      "offset": 15,
+      "top_bit_was_set": false,
+      "truncated": 1915850919,
+      "code": "850919"
+    },
+    {
+      "description": "Awkward case: Top bit (MSB) set before 31-bit clearing",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 30,
+      "step": 30,
+      "counter": 1,
+      "counter_bytes": "0000000000000001",
+      "hmac": "4c556a14b7f73ffb923e8d29186ff33d82242d8781872a7c55f447a61af02595",
+      "offset": 5,
+      "top_bit_was_set": true,
+      "truncated": 2000681874,
+      "code": "681874"
+    },
+    {
+      "description": "Awkward case: Six-digit code with leading zeros",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 1320,
+      "step": 30,
+      "counter": 44,
+      "counter_bytes": "000000000000002c",
+      "hmac": "331d259c8f32a675633c0303e21a418a41b65fd78e7ecaa87d7871164420dc71",
+      "offset": 1,
+      "top_bit_was_set": false,
+      "truncated": 489004175,
+      "code": "004175"
+    },
+    {
+      "description": "Awkward case: Counter near 32-bit boundary (2^32 - 1)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 128849018850,
+      "step": 30,
+      "counter": 4294967295,
+      "counter_bytes": "00000000ffffffff",
+      "hmac": "a0eaa17b47f47960250f1965932e27fddcf8b0a395502a3fb94a711e6fd66e42",
+      "offset": 2,
+      "top_bit_was_set": true,
+      "truncated": 561727476,
+      "code": "727476"
+    },
+    {
+      "description": "Awkward case: Counter across 32-bit boundary (2^32)",
+      "secret": "544553545f53545544454e545f5345435245545f4b45595f3332425954455321",
+      "unix_time": 128849018880,
+      "step": 30,
+      "counter": 4294967296,
+      "counter_bytes": "0000000100000000",
+      "hmac": "0e59ba406e0881613a3888e317be6a85f4e3a4be41b63afd70fd6faa0e17e62b",
+      "offset": 11,
+      "top_bit_was_set": true,
+      "truncated": 1662500458,
+      "code": "500458"
+    }
+  ],
+  "verification_vectors": [
+    {
+      "description": "Valid: Exact counter match c",
+      "roll_number": "23103030",
+      "payload": "23103030|055514",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": true,
+      "expected_counter": 56666667
+    },
+    {
+      "description": "Valid: Previous step match c - 1",
+      "roll_number": "23103030",
+      "payload": "23103030|965416",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": true,
+      "expected_counter": 56666666
+    },
+    {
+      "description": "Valid: Next step match c + 1",
+      "roll_number": "23103030",
+      "payload": "23103030|056112",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": true,
+      "expected_counter": 56666668
+    },
+    {
+      "description": "Invalid: Too old c - 2 (outside window)",
+      "roll_number": "23103030",
+      "payload": "23103030|288033",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Invalid: Too futuristic c + 2 (outside window)",
+      "roll_number": "23103030",
+      "payload": "23103030|751705",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: Code has only 5 digits",
+      "roll_number": "23103030",
+      "payload": "23103030|12345",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: Code has 7 digits",
+      "roll_number": "23103030",
+      "payload": "23103030|1234567",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: Two pipe delimiters in payload",
+      "roll_number": "23103030",
+      "payload": "23103030|123456|extra",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: Empty roll number",
+      "roll_number": "",
+      "payload": "|123456",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: No pipe delimiter",
+      "roll_number": "23103030",
+      "payload": "23103030123456",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    },
+    {
+      "description": "Malformed: Non-numeric code characters",
+      "roll_number": "23103030",
+      "payload": "23103030|abcdef",
+      "trusted_time": 1700000015,
+      "window": 1,
+      "expected_valid": false,
+      "expected_counter": null
+    }
+  ],
+  "rfc4231_vectors": [
+    {
+      "case": 1,
+      "key_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+      "data_hex": "4869205468657265",
+      "digest_hex": "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+    },
+    {
+      "case": 2,
+      "key_hex": "4a656665",
+      "data_hex": "7768617420646f2079612077616e7420666f72206e6f7468696e673f",
+      "digest_hex": "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+    },
+    {
+      "case": 3,
+      "key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "data_hex": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "digest_hex": "773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe"
+    },
+    {
+      "case": 4,
+      "key_hex": "0102030405060708090a0b0c0d0e0f10111213141516171819",
+      "data_hex": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "digest_hex": "82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b"
+    },
+    {
+      "case": 5,
+      "key_hex": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+      "data_hex": "546573742057697468205472756e636174696f6e",
+      "digest_hex": "a3b6167473100ee06e0c796c2955552bfa6f7c0a6a8aef8b93f860aab0cd20c5"
+    },
+    {
+      "case": 6,
+      "key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "data_hex": "54657374205573696e67204c6172676572205468616e20426c6f636b2d53697a65204b6579202d2048617368204b6579204669727374",
+      "digest_hex": "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
+    },
+    {
+      "case": 7,
+      "key_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "data_hex": "5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e",
+      "digest_hex": "9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2"
+    }
+  ]
+}

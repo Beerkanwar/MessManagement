@@ -32,6 +32,7 @@ from apps.hostel.models import (
 from apps.identity.models import Role, User, UserRole
 from apps.identity.selectors import get_user_role
 from apps.mess.models import Mess
+from apps.qr.services import provision_student_secret
 from apps.sync.models import ChangeCursor
 
 logger = structlog.get_logger(__name__)
@@ -304,6 +305,9 @@ def create_student(
         status="PENDING_VERIFICATION",
         effective_from=eff_from,
     )
+
+    # Provision QR secret [SPEC SDD §19, ImplementationGuide Phase 6]
+    provision_student_secret(student, actor=actor)
 
     record_audit_event(
         event_type="STUDENT_CREATED",
@@ -872,6 +876,9 @@ def upload_and_commit_import(
             status="PENDING_VERIFICATION",
             effective_from=eff_from,
         )
+
+        # Provision QR secret [SPEC SDD §19, ImplementationGuide Phase 6]
+        provision_student_secret(student, actor=actor)
 
         # Signal change for the assigned mess
         advance_change_cursor(f"mess:{mess.mess_id}:students")

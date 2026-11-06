@@ -1230,11 +1230,41 @@ paths:
       responses:
         '200':
           description: List of billing periods
+  /api/v1/qr/rotate:
+    post:
+      operationId: qr_rotate_create
+      description: Super Admin rotates QR secret keys for a single student, a hostel,
+        or a mess [SPEC SDD §21, DEC-13]. Retires active version, provisions version
+        n+1, advances change cursor, and records SECRET_ROTATED audit.
+      summary: Rotate Student Secret(s)
+      tags:
+      - qr
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RotateSecretRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RotateSecretResponse'
+          description: Secrets rotated successfully (contains version numbers only,
+            never secret keys)
+        '400':
+          description: Validation error or reason required
+        '403':
+          description: 'Forbidden: Super Admin only'
   /api/v1/qr/secret:
     get:
       operationId: qr_secret_retrieve
       description: Returns the active rolling QR secret key for the authenticated
-        student [SPEC SDD §19].
+        student on their active device [SPEC SDD §19, SDD §21]. Never cached outside
+        secure storage.
       summary: Get Student QR Secret
       tags:
       - qr
@@ -1242,7 +1272,15 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: QR secret payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentSecretResponse'
+          description: Active rolling secret key (base64) and version
+        '401':
+          description: Unauthenticated or device session expired
+        '403':
+          description: 'Forbidden: Non-students or inactive device'
   /api/v1/reports:
     get:
       operationId: reports_retrieve
@@ -1509,6 +1547,28 @@ paths:
               schema:
                 $ref: '#/components/schemas/StudentMe'
           description: ''
+  /api/v1/students/me/secret:
+    get:
+      operationId: students_me_secret_retrieve
+      description: Returns the active rolling QR secret key for the authenticated
+        student on their active device [SPEC SDD §19, SDD §21]. Never cached outside
+        secure storage.
+      summary: Get Student QR Secret
+      tags:
+      - qr
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentSecretResponse'
+          description: Active rolling secret key (base64) and version
+        '401':
+          description: Unauthenticated or device session expired
+        '403':
+          description: 'Forbidden: Non-students or inactive device'
   /api/v1/students/verifications:
     get:
       operationId: students_verifications_list
@@ -2679,6 +2739,61 @@ components:
       - email
       - new_password
       - otp
+    RotateSecretRequestRequest:
+      type: object
+      description: Request payload for POST /api/v1/qr/rotate (Super Admin only).
+      properties:
+        student_id:
+          type: integer
+          nullable: true
+          description: ID of single student to rotate
+        hostel_id:
+          type: integer
+          nullable: true
+          description: ID of hostel whose students to rotate
+        mess_id:
+          type: integer
+          nullable: true
+          description: ID of mess whose students to rotate
+        reason:
+          type: string
+          minLength: 1
+          description: Mandatory operational reason for rotation
+          maxLength: 500
+      required:
+      - reason
+    RotateSecretResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        affected_count:
+          type: integer
+        rotations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SecretRotationItem'
+      required:
+      - affected_count
+      - message
+      - rotations
+    SecretRotationItem:
+      type: object
+      properties:
+        student_id:
+          type: integer
+        roll_number:
+          type: string
+        old_version:
+          type: integer
+          nullable: true
+        new_version:
+          type: integer
+      required:
+      - new_version
+      - old_version
+      - roll_number
+      - student_id
     Status372Enum:
       enum:
       - ACTIVE
@@ -2943,6 +3058,26 @@ components:
       - phone_number
       - roll_number
       - student_id
+    StudentSecretResponse:
+      type: object
+      description: |-
+        Response payload for GET /api/v1/qr/secret [SPEC SDD §21].
+        Contains secret material delivered exclusively to the student over HTTPS.
+      properties:
+        secret_version:
+          type: integer
+          description: Active secret version number
+        secret:
+          type: string
+          description: Base64-encoded 32-byte secret key material
+        effective_from:
+          type: string
+          format: date-time
+          description: Timestamp when secret version became effective (UTC)
+      required:
+      - effective_from
+      - secret
+      - secret_version
     StudentUpdateStatusEnum:
       enum:
       - ACTIVE

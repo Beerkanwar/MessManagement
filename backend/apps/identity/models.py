@@ -345,6 +345,29 @@ class StudentSecret(TimeStampedModel):
         help_text="AES-GCM encrypted secret key material"
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ACTIVE")
+    effective_from = models.DateTimeField(
+        default=django_tz.now,
+        help_text="Timestamp when secret version becomes active (UTC) [SPEC DBDD §13]",
+    )
+    effective_to = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when secret version was retired (UTC) [SPEC DBDD §13]",
+    )
+    rotated_by = models.ForeignKey(
+        "identity.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="rotated_by_user_id",
+        related_name="rotated_secrets",
+        help_text="User who triggered rotation [SPEC DBDD §13]",
+    )
+    rotated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when secret was rotated (UTC) [SPEC DBDD §13]",
+    )
 
     class Meta:
         db_table = "identity_student_secret"

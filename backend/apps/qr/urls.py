@@ -1,6 +1,10 @@
+"""
+URL routes for QR module [SPEC SDD §64, ImplementationGuide Phase 6].
+"""
 from django.urls import path
-from apps.qr.views import qr_secret_stub_view
+from apps.qr import views
 
 urlpatterns = [
-    path("secret", qr_secret_stub_view, name="qr_secret"),
+    path("secret", views.qr_secret_view, name="qr_secret"),
+    path("rotate", views.qr_rotate_view, name="qr_rotate"),
 ]
