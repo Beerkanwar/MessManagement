@@ -39,7 +39,7 @@ from apps.attendance.services import (
 )
 from apps.audit.models import AuditLog
 from apps.billing.models import BillingPeriod
-from apps.core.clock import clock
+from apps.core.clock import IST_ZONE, clock
 from apps.core.exceptions import ConflictError, NotFoundError, ValidationError
 from apps.hostel.models import Hostel, HostelClerkAssignment, Student, StudentMessAssignment
 from apps.identity.models import DeviceRegistration, Role, User, UserRole
@@ -54,6 +54,20 @@ from apps.mess.models import (
     MessManagerAssignment,
 )
 from apps.pause.models import MessPause
+
+
+@pytest.fixture(autouse=True)
+def freeze_phase7_clock():
+    """
+    Pin the clock to the fixture's 2026-11-06 design date.
+
+    This module models "today" as 2026-11-06 (correction window, billing period,
+    transfers and rate changes). Without freezing, the 48-hour correction window
+    expires as real time advances and the suite rots.
+    """
+    clock.set_time(datetime(2026, 11, 6, 12, 0, tzinfo=IST_ZONE))
+    yield
+    clock.reset()
 
 
 @pytest.fixture(autouse=True)
@@ -77,7 +91,7 @@ def api_client():
 
 
 @pytest.fixture
-def test_setup(db):
+def test_setup(db, freeze_phase7_clock):
     """Sets up a realistic test campus: Hostels, Messes, Clerks, Managers, Students, Occurrences, and Rates."""
     # 1. Hostels
     hostel_a = Hostel.objects.create(code="H-A", name="Hostel Alpha", status="ACTIVE")
@@ -204,7 +218,15 @@ def auth_client(client, user, role_name):
             session_status="ACTIVE",
             registered_at=clock.now(),
         )
-    token = generate_access_token(user, role_name, device)
+    # This module freezes the clock in the past, but PyJWT checks `exp` against the
+    # real clock. Mint the token unfrozen, then restore the frozen test time.
+    frozen = clock._frozen_dt
+    clock.reset()
+    try:
+        token = generate_access_token(user, role_name, device)
+    finally:
+        if frozen is not None:
+            clock.set_time(frozen)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     return client
 
