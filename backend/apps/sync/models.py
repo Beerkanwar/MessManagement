@@ -55,8 +55,11 @@ class SyncTransaction(models.Model):
     TransactionId is unique across the entire system.
     """
     ENTITY_TYPE_CHOICES = [
-        ("MEAL", "Meal"),
-        ("EXTRA", "Extra"),
+        ("MEAL_CONSUMPTION", "Meal Consumption"),
+        ("EXTRA_TRANSACTION", "Extra Transaction"),
+        # Legacy codes retained for rows written before Phase 8 alignment.
+        ("MEAL", "Meal (legacy)"),
+        ("EXTRA", "Extra (legacy)"),
     ]
     PROCESSING_STATUS_CHOICES = [
         ("SYNCHRONIZED", "Synchronized"),
@@ -85,6 +88,14 @@ class SyncTransaction(models.Model):
     result_message = models.TextField(blank=True, default="")
     processed_at = models.DateTimeField(null=True, blank=True)
     idempotency_key = models.CharField(max_length=255, blank=True, default="")
+    client_payload = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Original client transaction body, retained so an ACCEPTED conflict "
+            "can be replayed with only the conflicting check waived [DEC-17]."
+        ),
+    )
 
     class Meta:
         db_table = "sync_sync_transaction"

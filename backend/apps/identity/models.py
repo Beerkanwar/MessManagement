@@ -368,6 +368,12 @@ class StudentSecret(TimeStampedModel):
         blank=True,
         help_text="Timestamp when secret was rotated (UTC) [SPEC DBDD §13]",
     )
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "identity_student_secret"

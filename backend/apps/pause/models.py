@@ -50,6 +50,12 @@ class MessPause(VersionedModel):
     cancelled_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     cancellation_reason = models.TextField(blank=True, default="")
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "pause_mess_pause"

@@ -2031,7 +2031,8 @@ paths:
   /api/v1/sync/batches:
     get:
       operationId: sync_batches_retrieve
-      description: Lists recent synchronization batch records [SPEC DBDD §11].
+      description: Lists recent synchronization batch records [SPEC DBDD §11]. Managers
+        see their own device; Super Admins see every device [Phase 8, build 10].
       summary: List Sync Batches
       tags:
       - sync
@@ -2065,6 +2066,30 @@ paths:
                 items:
                   $ref: '#/components/schemas/SyncConflict'
           description: ''
+  /api/v1/sync/conflicts/{conflict_id}:
+    get:
+      operationId: sync_conflicts_retrieve
+      description: Reads one synchronization conflict for administrative review [DEC-17].
+      summary: Read Sync Conflict
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncConflict'
+          description: ''
+        '404':
+          description: Conflict not found
   /api/v1/sync/conflicts/{conflict_id}/resolve:
     post:
       operationId: sync_conflicts_resolve_create
@@ -2088,6 +2113,49 @@ paths:
               schema:
                 $ref: '#/components/schemas/SyncConflict'
           description: ''
+  /api/v1/sync/devices/last-sync:
+    get:
+      operationId: sync_devices_last_sync_retrieve
+      description: Lists per-device last sync timestamps for the Devices screen [Phase
+        8, build 10].
+      summary: Per-Device Last Sync
+      parameters:
+      - in: query
+        name: mess_id
+        schema:
+          type: integer
+        description: Filter to devices of one mess
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of devices with last sync time
+  /api/v1/sync/transactions:
+    get:
+      operationId: sync_transactions_retrieve
+      description: Lists recent synchronization transactions for the admin Synchronization
+        screen [Phase 8, build 10].
+      summary: List Sync Transactions
+      parameters:
+      - in: query
+        name: batch_id
+        schema:
+          type: string
+        description: Filter by client batch id
+      - in: query
+        name: transaction_id
+        schema:
+          type: string
+        description: Filter by transaction id
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: List of sync transactions
   /api/v1/sync/upload:
     post:
       operationId: sync_upload_create
@@ -2528,10 +2596,14 @@ components:
       - new_hostel_code
     EntityTypeEnum:
       enum:
+      - MEAL_CONSUMPTION
+      - EXTRA_TRANSACTION
       - MEAL
       - EXTRA
       type: string
       description: |-
+        * `MEAL_CONSUMPTION` - MEAL_CONSUMPTION
+        * `EXTRA_TRANSACTION` - EXTRA_TRANSACTION
         * `MEAL` - MEAL
         * `EXTRA` - EXTRA
     ExtraItem:
@@ -4098,8 +4170,13 @@ components:
       type: object
       description: |-
         Request schema for POST /api/v1/sync/upload [SPEC SDD §67].
-        Includes DeviceId, ClientVersion, LastServerVersion, TrustedTimeMetadata, and Transactions[].
+        Includes BatchId, DeviceId, ClientVersion, LastServerVersion,
+        TrustedTimeMetadata, PendingTransactionCount and Transactions[].
       properties:
+        batch_id:
+          type: string
+          format: uuid
+          description: Client-generated batch GUID; replaying it is safe [Phase 8].
         device_id:
           type: string
           minLength: 1
@@ -4113,9 +4190,19 @@ components:
           type: integer
           minimum: 0
           default: 0
+        page_token:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Last student id of the previous bootstrap page [Phase 8].
         trusted_time_metadata:
           type: object
           additionalProperties: {}
+        pending_transaction_count:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Transactions still queued on the device after this batch [D14].
         transactions:
           type: array
           items:
@@ -4126,15 +4213,27 @@ components:
       type: object
       description: |-
         Response schema for POST /api/v1/sync/upload [SPEC SDD §67].
-        Returns ServerTime, AuthorizationState, StudentChanges, ConfigurationChanges,
-        TransactionResults[], and NewSyncCursor.
+        Returns ServerTime, AuthorizationState, OfflineWindows, TransactionResults[],
+        StudentChanges, ConfigurationChanges, AttendanceChanges, ResolvedResults,
+        NewSyncCursor, CursorIssuedAt and HasMore.
       properties:
+        batch_id:
+          type: string
+          format: uuid
         server_time:
           type: string
           format: date-time
         authorization_state:
           type: string
+        offline_windows:
+          type: object
+          additionalProperties: {}
         student_changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        student_removals:
           type: array
           items:
             type: object
@@ -4142,12 +4241,29 @@ components:
         configuration_changes:
           type: object
           additionalProperties: {}
+        attendance_changes:
+          type: object
+          additionalProperties: {}
+        resolved_results:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
         transaction_results:
           type: array
           items:
             $ref: '#/components/schemas/TransactionResultItem'
         new_sync_cursor:
           type: integer
+        cursor_issued_at:
+          type: string
+          format: date-time
+        has_more:
+          type: boolean
+          default: false
+        next_page_token:
+          type: integer
+          nullable: true
       required:
       - authorization_state
       - configuration_changes
@@ -4204,6 +4320,7 @@ components:
       - DUPLICATE
       - CONFLICT
       - REJECTED
+      - RETRYABLE_ERROR
       type: string
       description: |-
         * `SYNCHRONIZED` - SYNCHRONIZED
@@ -4211,6 +4328,7 @@ components:
         * `DUPLICATE` - DUPLICATE
         * `CONFLICT` - CONFLICT
         * `REJECTED` - REJECTED
+        * `RETRYABLE_ERROR` - RETRYABLE_ERROR
     TransferStudentRequest:
       type: object
       properties:

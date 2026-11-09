@@ -39,6 +39,10 @@ CONFIG_REGISTRY: dict[str, tuple[str, str, str, bool]] = {
     "offline.normal_hours": ("INTEGER", "24", "Normal allowed offline operational duration in hours", False),
     "offline.grace_hours": ("INTEGER", "24", "Additional grace period for offline operation in hours", False),
     "sync.batch_max_transactions": ("INTEGER", "500", "Maximum transactions accepted per sync batch [D11]", False),
+    "sync.overlap_minutes": ("INTEGER", "2", "Overlap window before the cursor issue time for late commits", False),
+    "sync.student_page_size": ("INTEGER", "500", "Students per bootstrap sync page", False),
+    "sync.attendance_window_days": ("INTEGER", "3", "Days of effective attendance returned in the sync download", False),
+    "sync.rate_limit_per_minute": ("INTEGER", "6", "Maximum sync calls per device per minute", False),
     "billing.period_lock_window_days": ("INTEGER", "2", "Days after month end when billing period moves to LOCKED", False),
 
     # DEC-06 Meal End Times (IST)

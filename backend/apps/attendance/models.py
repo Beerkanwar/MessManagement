@@ -89,6 +89,12 @@ class MealConsumption(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "attendance_meal_consumption"
@@ -175,6 +181,12 @@ class ExtraTransaction(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "attendance_extra_transaction"

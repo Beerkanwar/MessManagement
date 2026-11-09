@@ -57,6 +57,12 @@ class Student(VersionedModel):
     year_of_study = models.IntegerField(null=True, blank=True)
     room_number = models.CharField(max_length=50, blank=True, default="")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ACTIVE")
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "hostel_student"
@@ -107,6 +113,12 @@ class StudentMessAssignment(VersionedModel):
     )
     verified_at = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, default="")
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "hostel_student_mess_assignment"

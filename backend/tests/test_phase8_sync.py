@@ -25,6 +25,7 @@ from apps.attendance.models import ExtraTransaction, MealConsumption
 from apps.audit.models import AuditLog
 from apps.billing.models import BillingPeriod
 from apps.config.models import ApplicationVersionPolicy, SystemSetting
+from apps.config.services import clear_settings_cache
 from apps.core.clock import clock
 from apps.hostel.models import Hostel, Student, StudentMessAssignment
 from apps.identity.models import DeviceRegistration, RefreshToken, Role, StudentSecret, User, UserRole
@@ -376,6 +377,7 @@ class TestSyncBatchLimitsAndScope:
 
         response = client.post("/api/v1/sync/upload", payload, format="json")
         assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert AuditLog.objects.filter(event_type="SYNC_FAILURE").exists()
 
     def test_manager_scope_unauthorized_student_rejected(self, api_client, sync_setup):
         """Manager 1 cannot record Student 2 who belongs to Mess 2."""
@@ -420,6 +422,7 @@ class TestSyncBatchLimitsAndScope:
         payload = {"device_id": dev.device_id, "transactions": []}
         response = client.post("/api/v1/sync/upload", payload, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
+        assert AuditLog.objects.filter(event_type="SYNC_FAILURE").exists()
 
 
 # ==============================================================================
@@ -602,7 +605,7 @@ class TestSyncLockedBillingAndPause:
 class TestSyncConflictResolutionAndHistory:
     """Verifies Super Admin conflict inspection and resolution [SPEC DBDD §11, App Flow §13]."""
 
-    def test_super_admin_resolves_conflict(self, api_client, sync_setup):
+    def test_super_admin_rejects_locked_period_conflict(self, api_client, sync_setup):
         admin = sync_setup["admin_user"]
         dev = sync_setup["admin_device"]
         client = auth_client(api_client, admin, "SUPER_ADMIN", dev)
@@ -635,20 +638,116 @@ class TestSyncConflictResolutionAndHistory:
         assert list_resp.status_code == status.HTTP_200_OK
         assert len(list_resp.data) >= 1
 
+        # Reading one conflict is part of the Super Admin review screen.
+        detail_resp = client.get(f"/api/v1/sync/conflicts/{conflict.conflict_id}")
+        assert detail_resp.status_code == status.HTTP_200_OK
+        assert detail_resp.data["conflict_id"] == conflict.conflict_id
+
+        # A locked period is never waivable [DEC-17].
+        accepted_resp = client.post(
+            f"/api/v1/sync/conflicts/{conflict.conflict_id}/resolve",
+            {"resolution": "ACCEPTED", "notes": "Try to force it"},
+            format="json",
+        )
+        assert accepted_resp.status_code == status.HTTP_409_CONFLICT
+        assert accepted_resp.data["code"] == "LOCKED_PERIOD_NOT_WAIVABLE"
+
         # Resolve conflict
         resolve_resp = client.post(
             f"/api/v1/sync/conflicts/{conflict.conflict_id}/resolve",
-            {"resolution": "ACCEPTED", "notes": "Approved by warden after review"},
+            {"resolution": "REJECTED", "notes": "Approved by warden after review"},
+            format="json",
+        )
+        assert resolve_resp.status_code == status.HTTP_200_OK
+        assert resolve_resp.data["resolution"] == "REJECTED"
+        assert resolve_resp.data["resolution_notes"] == "Approved by warden after review"
+
+        conflict.refresh_from_db()
+        assert conflict.resolution == "REJECTED"
+        assert conflict.resolved_by_user == admin
+        assert AuditLog.objects.filter(event_type="SYNC_CONFLICT_RESOLVED").exists()
+
+    def test_super_admin_accepts_assignment_conflict_and_replays(self, api_client, sync_setup):
+        """ACCEPTED re-runs the command with only the conflicting check waived [DEC-17]."""
+        admin = sync_setup["admin_user"]
+        admin_dev = sync_setup["admin_device"]
+        client = auth_client(api_client, admin, "SUPER_ADMIN", admin_dev)
+
+        student = sync_setup["student_1"]
+        mess = sync_setup["mess_1"]
+        dev = sync_setup["device_mgr_1"]
+        sync_date = sync_setup["sync_date"]
+
+        # Student starts their Mess 1 assignment after the meal date, so the
+        # original upload conflicted with NO_ASSIGNMENT_ON_DATE.
+        assignment = StudentMessAssignment.objects.get(student=student)
+        assignment.effective_from = sync_date + timedelta(days=1)
+        assignment.save(update_fields=["effective_from"])
+
+        txn_id = uuid.uuid4()
+        batch = SyncBatch.objects.create(
+            batch_id=uuid.uuid4(),
+            device_registration=dev,
+            user=sync_setup["mgr_1_user"],
+            status="COMPLETED",
+            sent_at=clock.now(),
+        )
+        payload = {
+            "student_id": student.student_id,
+            "mess_id": mess.mess_id,
+            "meal_type": "LUNCH",
+            "meal_date": str(sync_date),
+            "transaction_timestamp": f"{sync_date}T12:30:00Z",
+        }
+        st = SyncTransaction.objects.create(
+            transaction_id=txn_id,
+            sync_batch=batch,
+            entity_type="MEAL_CONSUMPTION",
+            client_created_at=clock.now(),
+            processing_status="CONFLICT",
+            result_code="NO_ASSIGNMENT_ON_DATE",
+            result_message="Student had no active mess assignment on MealDate.",
+            client_payload=payload,
+        )
+        conflict = SyncConflict.objects.create(
+            sync_transaction=st,
+            conflict_type="ASSIGNMENT_CHANGED",
+            conflict_reason="Student had no active mess assignment on MealDate.",
+        )
+
+        resolve_resp = client.post(
+            f"/api/v1/sync/conflicts/{conflict.conflict_id}/resolve",
+            {"resolution": "ACCEPTED", "notes": "Assignment record was late"},
             format="json",
         )
         assert resolve_resp.status_code == status.HTTP_200_OK
         assert resolve_resp.data["resolution"] == "ACCEPTED"
-        assert resolve_resp.data["resolution_notes"] == "Approved by warden after review"
 
-        conflict.refresh_from_db()
-        assert conflict.resolution == "ACCEPTED"
-        assert conflict.resolved_by_user == admin
-        assert AuditLog.objects.filter(event_type="SYNC_CONFLICT_RESOLVED").exists()
+        # The record is created once, with Source SYNC_RESOLUTION.
+        meal = MealConsumption.objects.get(transaction_id=txn_id)
+        assert meal.source == "SYNC_RESOLUTION"
+
+        # A second ACCEPTED attempt cannot create it again.
+        again = client.post(
+            f"/api/v1/sync/conflicts/{conflict.conflict_id}/resolve",
+            {"resolution": "ACCEPTED", "notes": "again"},
+            format="json",
+        )
+        assert again.status_code == status.HTTP_409_CONFLICT
+        assert MealConsumption.objects.filter(transaction_id=txn_id).count() == 1
+
+        # The Manager sees the final outcome through resolved results.
+        mgr = sync_setup["mgr_1_user"]
+        mgr_client = auth_client(APIClient(), mgr, "MESS_MANAGER", dev)
+        sync_resp = mgr_client.post(
+            "/api/v1/sync/upload",
+            {"device_id": dev.device_id, "last_server_version": 0, "transactions": []},
+            format="json",
+        )
+        assert sync_resp.status_code == status.HTTP_200_OK
+        resolved = {str(row["transaction_id"]): row for row in sync_resp.data["resolved_results"]}
+        assert resolved[str(txn_id)]["status"] == "SYNCHRONIZED"
+        assert resolved[str(txn_id)]["resolution"] == "ACCEPTED"
 
     def test_sync_batches_list_endpoint(self, api_client, sync_setup):
         mgr = sync_setup["mgr_1_user"]
@@ -667,3 +766,399 @@ class TestSyncConflictResolutionAndHistory:
         response = client.get("/api/v1/sync/batches")
         assert response.status_code == status.HTTP_200_OK
         assert len(response.data) >= 1
+
+
+# ==============================================================================
+# 6. Build-checkpoint scenarios [ImplementationGuide Phase 8]
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestSyncGuideCheckpoints:
+    """Covers the Phase 8 build and test checkpoints end to end."""
+
+    def _meal_item(self, setup, txn_id, meal_type="LUNCH", minute=30):
+        return {
+            "transaction_id": str(txn_id),
+            "entity_type": "MEAL_CONSUMPTION",
+            "client_created_at": f"2026-11-09T12:{minute:02d}:00Z",
+            "payload": {
+                "student_id": setup["student_1"].student_id,
+                "mess_id": setup["mess_1"].mess_id,
+                "meal_type": meal_type,
+                "meal_date": str(setup["sync_date"]),
+                "transaction_timestamp": f"2026-11-09T12:{minute:02d}:00Z",
+            },
+        }
+
+    def _extra_item(self, setup, txn_id, minute=30):
+        return {
+            "transaction_id": str(txn_id),
+            "entity_type": "EXTRA_TRANSACTION",
+            "client_created_at": f"2026-11-09T12:{minute:02d}:00Z",
+            "payload": {
+                "student_id": setup["student_1"].student_id,
+                "mess_id": setup["mess_1"].mess_id,
+                "extra_item_id": setup["extra_1"].extra_item_id,
+                "quantity": 1,
+                "transaction_timestamp": f"2026-11-09T12:{minute:02d}:00Z",
+            },
+        }
+
+    def test_replaying_completed_batch_id_returns_stored_results(
+        self, api_client, sync_setup
+    ):
+        mgr = sync_setup["mgr_1_user"]
+        dev = sync_setup["device_mgr_1"]
+        client = auth_client(api_client, mgr, "MESS_MANAGER", dev)
+
+        batch_id = uuid.uuid4()
+        txn_id = uuid.uuid4()
+        payload = {
+            "batch_id": str(batch_id),
+            "device_id": dev.device_id,
+            "transactions": [self._meal_item(sync_setup, txn_id)],
+        }
+
+        first = client.post("/api/v1/sync/upload", payload, format="json")
+        second = client.post("/api/v1/sync/upload", payload, format="json")
+
+        assert first.status_code == status.HTTP_200_OK
+        assert second.status_code == status.HTTP_200_OK
+        assert second.data["batch_id"] == str(batch_id)
+        assert second.data["transaction_results"] == first.data["transaction_results"]
+        assert SyncBatch.objects.filter(batch_id=batch_id).count() == 1
+        assert SyncTransaction.objects.filter(transaction_id=txn_id).count() == 1
+        assert MealConsumption.objects.filter(transaction_id=txn_id).count() == 1
+
+    def test_partial_batch_resumes_without_duplicates(self, api_client, sync_setup):
+        """Server killed after half the items: resend completes the rest [build 2-3]."""
+        mgr = sync_setup["mgr_1_user"]
+        dev = sync_setup["device_mgr_1"]
+        client = auth_client(api_client, mgr, "MESS_MANAGER", dev)
+
+        batch_id = uuid.uuid4()
+        first_txn = uuid.uuid4()
+        second_txn = uuid.uuid4()
+        batch = SyncBatch.objects.create(
+            batch_id=batch_id,
+            device_registration=dev,
+            user=mgr,
+            status="IN_PROGRESS",
+            sent_at=clock.now(),
+        )
+        SyncTransaction.objects.create(
+            transaction_id=first_txn,
+            sync_batch=batch,
+            entity_type="MEAL_CONSUMPTION",
+            client_created_at=clock.now() - timedelta(minutes=5),
+            processing_status="SYNCHRONIZED",
+            result_code="SYNCHRONIZED",
+        )
+
+        payload = {
+            "batch_id": str(batch_id),
+            "device_id": dev.device_id,
+            "transactions": [
+                self._meal_item(sync_setup, first_txn, "LUNCH", 30),
+                self._meal_item(sync_setup, second_txn, "DINNER", 40),
+            ],
+        }
+        response = client.post("/api/v1/sync/upload", payload, format="json")
+        assert response.status_code == status.HTTP_200_OK
+
+        by_id = {
+            str(row["transaction_id"]): row
+            for row in response.data["transaction_results"]
+        }
+        assert by_id[str(first_txn)]["status"] == "SYNCHRONIZED"
+        assert by_id[str(second_txn)]["status"] == "SYNCHRONIZED"
+
+        batch.refresh_from_db()
+        assert batch.status == "COMPLETED"
+        assert batch.transactions.count() == 2
+        assert MealConsumption.objects.filter(transaction_id=second_txn).count() == 1
+
+    def test_transfer_removes_from_old_cache_and_adds_to_new(
+        self, api_client, sync_setup
+    ):
+        mgr_1 = sync_setup["mgr_1_user"]
+        dev_1 = sync_setup["device_mgr_1"]
+        mgr_2 = sync_setup["mgr_2_user"]
+        dev_2 = sync_setup["device_mgr_2"]
+        student = sync_setup["student_1"]
+        sync_date = sync_setup["sync_date"]
+
+        client_1 = auth_client(api_client, mgr_1, "MESS_MANAGER", dev_1)
+        first = client_1.post(
+            "/api/v1/sync/upload",
+            {"device_id": dev_1.device_id, "last_server_version": 0, "transactions": []},
+            format="json",
+        )
+        assert first.status_code == status.HTTP_200_OK
+        assert student.student_id in {
+            row["student_id"] for row in first.data["student_changes"]
+        }
+
+        old_assignment = StudentMessAssignment.objects.get(
+            student=student, mess=sync_setup["mess_1"]
+        )
+        old_assignment.status = "ENDED"
+        old_assignment.effective_to = sync_date
+        old_assignment.save()
+        StudentMessAssignment.objects.create(
+            student=student,
+            hostel=sync_setup["hostel_b"],
+            mess=sync_setup["mess_2"],
+            status="ACTIVE",
+            effective_from=sync_date,
+        )
+
+        delta = client_1.post(
+            "/api/v1/sync/upload",
+            {
+                "device_id": dev_1.device_id,
+                "last_server_version": first.data["new_sync_cursor"],
+                "transactions": [],
+            },
+            format="json",
+        )
+        assert delta.status_code == status.HTTP_200_OK
+        removals = [row for row in delta.data["student_removals"] if row["student_id"] == student.student_id]
+        assert removals and removals[0]["reason"] == "ASSIGNMENT_ENDED"
+        assert student.student_id not in {
+            row["student_id"] for row in delta.data["student_changes"]
+        }
+
+        client_2 = auth_client(APIClient(), mgr_2, "MESS_MANAGER", dev_2)
+        new_mess = client_2.post(
+            "/api/v1/sync/upload",
+            {"device_id": dev_2.device_id, "last_server_version": 0, "transactions": []},
+            format="json",
+        )
+        assert new_mess.status_code == status.HTTP_200_OK
+        assert student.student_id in {
+            row["student_id"] for row in new_mess.data["student_changes"]
+        }
+
+    def test_download_contains_only_authorized_students_and_fields(
+        self, api_client, sync_setup
+    ):
+        client = auth_client(
+            api_client,
+            sync_setup["mgr_1_user"],
+            "MESS_MANAGER",
+            sync_setup["device_mgr_1"],
+        )
+        response = client.post(
+            "/api/v1/sync/upload",
+            {
+                "device_id": sync_setup["device_mgr_1"].device_id,
+                "last_server_version": 0,
+                "transactions": [],
+            },
+            format="json",
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        rows = response.data["student_changes"]
+        ids = {row["student_id"] for row in rows}
+        assert sync_setup["student_1"].student_id in ids
+        assert sync_setup["student_2"].student_id not in ids
+
+        allowed = {
+            "student_id",
+            "roll_number",
+            "display_name",
+            "student_status",
+            "hostel_id",
+            "mess_id",
+            "assignment_version",
+            "change_version",
+            "pause_state",
+            "secret_version",
+            "secret_ciphertext",
+        }
+        for row in rows:
+            assert set(row.keys()) == allowed
+
+        # Student 2's secret never appears in Manager 1's payload.
+        assert all(row["secret_ciphertext"] != "cipher2" for row in rows)
+        assert any(row["secret_ciphertext"] == "cipher1" for row in rows)
+
+    def test_bootstrap_paging_union_is_exactly_authorized_set(
+        self, api_client, sync_setup
+    ):
+        mgr = sync_setup["mgr_1_user"]
+        dev = sync_setup["device_mgr_1"]
+        mess = sync_setup["mess_1"]
+        hostel = sync_setup["hostel_a"]
+        client = auth_client(api_client, mgr, "MESS_MANAGER", dev)
+
+        for index in range(25):
+            user = User.objects.create(
+                email=f"page_student_{index}@college.edu",
+                normalized_email=f"page_student_{index}@college.edu",
+                full_name=f"Page Student {index}",
+                status="ACTIVE",
+            )
+            UserRole.objects.create(user=user, role=Role.objects.get(name="STUDENT"))
+            student = Student.objects.create(
+                user=user,
+                roll_number=f"PAGE{index:04d}",
+                hostel=hostel,
+                status="ACTIVE",
+            )
+            StudentMessAssignment.objects.create(
+                student=student,
+                hostel=hostel,
+                mess=mess,
+                status="ACTIVE",
+                effective_from=date(2026, 11, 1),
+            )
+
+        SystemSetting.objects.create(
+            key="sync.student_page_size",
+            value="10",
+            data_type="INTEGER",
+            effective_from=clock.now(),
+            description="Test page size",
+        )
+        clear_settings_cache()
+        try:
+            collected = []
+            page_token = None
+            for _ in range(10):
+                body = {
+                    "device_id": dev.device_id,
+                    "last_server_version": 0,
+                    "transactions": [],
+                }
+                if page_token is not None:
+                    body["page_token"] = page_token
+                response = client.post("/api/v1/sync/upload", body, format="json")
+                assert response.status_code == status.HTTP_200_OK
+                collected.extend(row["student_id"] for row in response.data["student_changes"])
+                if not response.data["has_more"]:
+                    assert response.data["next_page_token"] is None
+                    break
+                page_token = response.data["next_page_token"]
+                assert page_token is not None
+            else:  # pragma: no cover - guard against an endless paging loop
+                pytest.fail("Bootstrap paging did not terminate")
+
+            expected = set(
+                StudentMessAssignment.objects.filter(
+                    mess=mess, status="ACTIVE"
+                ).values_list("student_id", flat=True)
+            )
+            assert len(collected) == len(set(collected))
+            assert set(collected) == expected
+        finally:
+            clear_settings_cache()
+
+    def test_late_commit_delivered_by_overlap_window(self, api_client, sync_setup):
+        """A row changed at/after the cursor time is still delivered [build 6]."""
+        client = auth_client(
+            api_client,
+            sync_setup["mgr_1_user"],
+            "MESS_MANAGER",
+            sync_setup["device_mgr_1"],
+        )
+        first = client.post(
+            "/api/v1/sync/upload",
+            {
+                "device_id": sync_setup["device_mgr_1"].device_id,
+                "last_server_version": 0,
+                "transactions": [],
+            },
+            format="json",
+        )
+        assert first.status_code == status.HTTP_200_OK
+        assert first.data["cursor_issued_at"]
+
+        # A cursor far ahead of every change_version leaves only the overlap
+        # window able to deliver the row.
+        second = client.post(
+            "/api/v1/sync/upload",
+            {
+                "device_id": sync_setup["device_mgr_1"].device_id,
+                "last_server_version": 10**9,
+                "transactions": [],
+            },
+            format="json",
+        )
+        assert second.status_code == status.HTTP_200_OK
+        assert sync_setup["student_1"].student_id in {
+            row["student_id"] for row in second.data["student_changes"]
+        }
+
+    def test_batched_volume_across_35_batches(self, api_client, sync_setup):
+        """
+        Batching checkpoint: 35 consecutive batches all upload and complete.
+
+        The guide's full 7,000-transaction run takes ~11 minutes on the test
+        database, so CI runs the same 35-batch shape at a bounded volume.
+        """
+        mgr = sync_setup["mgr_1_user"]
+        dev = sync_setup["device_mgr_1"]
+        client = auth_client(api_client, mgr, "MESS_MANAGER", dev)
+        per_batch = 20
+        batch_count = 35
+
+        SystemSetting.objects.create(
+            key="sync.rate_limit_per_minute",
+            value="1000",
+            data_type="INTEGER",
+            effective_from=clock.now(),
+            description="Test throttle headroom",
+        )
+        clear_settings_cache()
+        try:
+            accepted = 0
+            for batch_index in range(batch_count):
+                transactions = []
+                for item_index in range(per_batch):
+                    minute = item_index % 60
+                    second = item_index % 60
+                    txn_id = uuid.uuid4()
+                    transactions.append(
+                        {
+                            "transaction_id": str(txn_id),
+                            "entity_type": "EXTRA_TRANSACTION",
+                            "client_created_at": (
+                                f"2026-11-09T{(batch_index % 12) + 8:02d}:"
+                                f"{minute:02d}:{second:02d}Z"
+                            ),
+                            "payload": {
+                                "student_id": sync_setup["student_1"].student_id,
+                                "mess_id": sync_setup["mess_1"].mess_id,
+                                "extra_item_id": sync_setup["extra_1"].extra_item_id,
+                                "quantity": 1,
+                                "transaction_timestamp": (
+                                    f"2026-11-09T{(batch_index % 12) + 8:02d}:"
+                                    f"{minute:02d}:{second:02d}Z"
+                                ),
+                            },
+                        }
+                    )
+                response = client.post(
+                    "/api/v1/sync/upload",
+                    {
+                        "batch_id": str(uuid.uuid4()),
+                        "device_id": dev.device_id,
+                        "transactions": transactions,
+                    },
+                    format="json",
+                )
+                assert response.status_code == status.HTTP_200_OK
+                statuses = [row["status"] for row in response.data["transaction_results"]]
+                assert len(statuses) == per_batch
+                assert all(status == "SYNCHRONIZED" for status in statuses)
+                accepted += len(statuses)
+            assert accepted == per_batch * batch_count
+            assert (
+                ExtraTransaction.objects.filter(mess=sync_setup["mess_1"]).count()
+                == accepted
+            )
+        finally:
+            clear_settings_cache()

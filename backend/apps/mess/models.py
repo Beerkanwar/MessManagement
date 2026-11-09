@@ -123,6 +123,12 @@ class MealOccurrence(VersionedModel):
     configuration_version = models.BigIntegerField(
         default=1, help_text="Tracks menu/time configuration changes"
     )
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "mess_meal_occurrence"
@@ -166,6 +172,12 @@ class MealRate(TimeStampedModel):
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_meal_rates"
     )
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "mess_meal_rate"
@@ -202,6 +214,12 @@ class ExtraItem(VersionedModel):
         max_length=255, help_text="Trimmed and uppercase for uniqueness check [REC]"
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="ACTIVE")
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
+    )
 
     class Meta:
         db_table = "mess_extra_item"
@@ -237,6 +255,12 @@ class ExtraPrice(TimeStampedModel):
     )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_extra_prices"
+    )
+    change_version = models.BigIntegerField(
+        default=0,
+        db_index=True,
+        editable=False,
+        help_text="Monotonic sync change marker issued by the database [Phase 8]",
     )
 
     class Meta:

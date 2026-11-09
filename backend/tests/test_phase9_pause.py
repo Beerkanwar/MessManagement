@@ -636,10 +636,17 @@ class TestPauseSubmit:
         assignment = StudentMessAssignment.objects.get(
             student=pause_setup["student"]
         )
-        before = assignment.version
+        before_version = assignment.version
+        before_change = assignment.change_version
         submit_pause(pause_setup)
         assignment.refresh_from_db()
-        assert assignment.version == before + 1
+        assert assignment.version == before_version + 1
+
+        # The database trigger issues a new change marker so Manager polling
+        # sees the pause through the shared cursor [Phase 8, build 6].
+        assert assignment.change_version > before_change
+        pause = MessPause.objects.get(student=pause_setup["student"])
+        assert pause.change_version > 0
 
         delta = get_delta_students(pause_setup["mess"].mess_id, client_cursor=0)
         student_rows = [

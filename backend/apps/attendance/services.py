@@ -17,6 +17,11 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from zoneinfo import ZoneInfo
 
+from apps.attendance.constants import (
+    WAIVE_ASSIGNMENT,
+    WAIVE_MEAL_CANCELLED,
+    WAIVE_SCOPE,
+)
 from apps.attendance.models import AttendanceCorrection, ExtraTransaction, MealConsumption
 from apps.audit.services import record_audit_event
 from apps.billing.models import BillingPeriod
@@ -76,6 +81,7 @@ def record_meal(
     device_registration: DeviceRegistration | None = None,
     source: str = "QR",
     correlation_id: str = "",
+    waive_checks: set[str] | None = None,
 ) -> RecordMealResult:
     """
     Executes the 9-step meal acceptance rules pipeline in order [SPEC SDD §52]:
@@ -94,6 +100,8 @@ def record_meal(
 
     if isinstance(meal_date, str):
         meal_date = date.fromisoformat(meal_date)
+
+    waive = waive_checks or set()
 
     # Fast-path idempotency check before locking
     existing_by_txn = MealConsumption.objects.filter(transaction_id=transaction_id).first()
@@ -124,14 +132,21 @@ def record_meal(
     role = get_user_role(recorded_by_user)
     if role == "MESS_MANAGER":
         manager_mess = get_manager_scope(recorded_by_user)
-        if not manager_mess or manager_mess.mess_id != mess_obj.mess_id:
+        if (
+            (not manager_mess or manager_mess.mess_id != mess_obj.mess_id)
+            and WAIVE_SCOPE not in waive
+        ):
             return RecordMealResult(
                 status="REJECTED",
                 code="MESS_SCOPE_MISMATCH",
                 message="Manager is not assigned to this mess [SRS-AC-11].",
                 transaction_id=transaction_id,
             )
-        if device_registration and device_registration.session_status != "ACTIVE":
+        if (
+            device_registration
+            and device_registration.session_status
+            not in ("ACTIVE", "REVOKE_PENDING_SYNC")
+        ):
             return RecordMealResult(
                 status="REJECTED",
                 code="DEVICE_NOT_ACTIVE",
@@ -200,7 +215,7 @@ def record_meal(
             message=f"No meal scheduled for {mess_obj.name} on {meal_date} ({meal_type_obj.code}).",
             transaction_id=transaction_id,
         )
-    if occurrence.status == "CANCELLED":
+    if occurrence.status == "CANCELLED" and WAIVE_MEAL_CANCELLED not in waive:
         return RecordMealResult(
             status="CONFLICT",
             code="MEAL_CANCELLED",
@@ -220,7 +235,7 @@ def record_meal(
         .first()
     )
 
-    if not assignment_on_date:
+    if not assignment_on_date and WAIVE_ASSIGNMENT not in waive:
         return RecordMealResult(
             status="CONFLICT",
             code="NO_ASSIGNMENT_ON_DATE",
@@ -228,7 +243,11 @@ def record_meal(
             transaction_id=transaction_id,
         )
 
-    if assignment_on_date.mess_id != mess_obj.mess_id:
+    if (
+        assignment_on_date
+        and assignment_on_date.mess_id != mess_obj.mess_id
+        and WAIVE_ASSIGNMENT not in waive
+    ):
         return RecordMealResult(
             status="CONFLICT",
             code="ASSIGNMENT_MISMATCH",
@@ -372,6 +391,7 @@ def record_extra(
     device_registration: DeviceRegistration | None = None,
     source: str = "SCAN_CONFIRMATION",
     correlation_id: str = "",
+    waive_checks: set[str] | None = None,
 ) -> RecordExtraResult:
     """
     Executes extra item acceptance rules:
@@ -384,6 +404,8 @@ def record_extra(
     """
     if isinstance(transaction_id, str):
         transaction_id = uuid.UUID(transaction_id)
+
+    waive = waive_checks or set()
 
     # Idempotency check
     existing_by_txn = ExtraTransaction.objects.filter(transaction_id=transaction_id).first()
@@ -424,14 +446,21 @@ def record_extra(
     role = get_user_role(recorded_by_user)
     if role == "MESS_MANAGER":
         manager_mess = get_manager_scope(recorded_by_user)
-        if not manager_mess or manager_mess.mess_id != mess_obj.mess_id:
+        if (
+            (not manager_mess or manager_mess.mess_id != mess_obj.mess_id)
+            and WAIVE_SCOPE not in waive
+        ):
             return RecordExtraResult(
                 status="REJECTED",
                 code="MESS_SCOPE_MISMATCH",
                 message="Manager is not assigned to this mess.",
                 transaction_id=transaction_id,
             )
-        if device_registration and device_registration.session_status != "ACTIVE":
+        if (
+            device_registration
+            and device_registration.session_status
+            not in ("ACTIVE", "REVOKE_PENDING_SYNC")
+        ):
             return RecordExtraResult(
                 status="REJECTED",
                 code="DEVICE_NOT_ACTIVE",
