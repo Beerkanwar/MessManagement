@@ -1457,8 +1457,9 @@ paths:
           description: ''
   /api/v1/pauses:
     get:
-      operationId: pauses_retrieve
-      description: Lists student mess pause records [SPEC SDD §64, DBDD §7].
+      operationId: pauses_list
+      description: Lists the authenticated student's own pause history [SPEC DBDD
+        §7].
       summary: List Mess Pauses
       tags:
       - pauses
@@ -1466,7 +1467,115 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: List of mess pauses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PauseResponse'
+          description: ''
+    post:
+      operationId: pauses_create
+      description: Student requests a mess pause [SPEC DBDD §7, DEC-06]. Pause starts
+        in SCHEDULED status and becomes ACTIVE after three qualifying Breakfast, Lunch
+        or Dinner slots pass.
+      summary: Request Mess Pause
+      tags:
+      - pauses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PauseResponse'
+          description: ''
+        '400':
+          description: Validation error
+        '403':
+          description: Permission denied
+        '409':
+          description: 'Conflict: existing pause'
+  /api/v1/pauses/{pause_id}/cancel:
+    post:
+      operationId: pauses_cancel_create
+      description: Cancels the authenticated student's own SCHEDULED or ACTIVE pause
+        [SPEC DBDD §7, DEC-23].
+      summary: Cancel Mess Pause
+      parameters:
+      - in: path
+        name: pause_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - pauses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseCancelRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PauseResponse'
+          description: ''
+        '400':
+          description: Validation error
+        '403':
+          description: Permission denied
+        '404':
+          description: Pause not found
+        '409':
+          description: 'Conflict: already terminated'
+  /api/v1/pauses/current:
+    get:
+      operationId: pauses_current_retrieve
+      description: Returns the authenticated student's current SCHEDULED or ACTIVE
+        pause, including its counted slots, effective start and end dates [DEC-06].
+      summary: Current Mess Pause
+      tags:
+      - pauses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Current pause state (or has_pause=false)
+  /api/v1/pauses/request:
+    post:
+      operationId: pauses_request_create
+      description: Alias of POST /api/v1/pauses retained for existing clients.
+      summary: Request Mess Pause (legacy path)
+      tags:
+      - pauses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PauseRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PauseResponse'
+          description: ''
+        '400':
+          description: Validation error
   /api/v1/periods:
     get:
       operationId: periods_retrieve
@@ -1919,19 +2028,124 @@ paths:
       responses:
         '200':
           description: Bulk verification results
-  /api/v1/upload:
-    post:
-      operationId: upload_create
-      description: Synchronizes offline transactions uploaded by Mess Managers [SPEC
-        SDD §67, §68].
-      summary: Manager Batch Upload
+  /api/v1/sync/batches:
+    get:
+      operationId: sync_batches_retrieve
+      description: Lists recent synchronization batch records [SPEC DBDD §11].
+      summary: List Sync Batches
       tags:
       - sync
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: Batch sync results
+          description: List of sync batches
+  /api/v1/sync/conflicts:
+    get:
+      operationId: sync_conflicts_list
+      description: Lists offline synchronization conflicts requiring administrative
+        review [SPEC DBDD §11, App Flow §13].
+      summary: List Sync Conflicts
+      parameters:
+      - in: query
+        name: resolved
+        schema:
+          type: boolean
+        description: Filter by resolution status (true/false)
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SyncConflict'
+          description: ''
+  /api/v1/sync/conflicts/{conflict_id}/resolve:
+    post:
+      operationId: sync_conflicts_resolve_create
+      description: Super Admin resolves a synchronization conflict (ACCEPTED or REJECTED)
+        [SPEC DBDD §11, App Flow §13].
+      summary: Resolve Sync Conflict
+      parameters:
+      - in: path
+        name: conflict_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sync
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncConflict'
+          description: ''
+  /api/v1/sync/upload:
+    post:
+      operationId: sync_upload_create
+      description: Synchronizes offline transactions uploaded by Mess Managers [SPEC
+        SDD §67, §68]. Processes batched meal and extra transactions with per-transaction
+        idempotency, enforces 500-item limits, duplicate prevention, and returns delta
+        updates.
+      summary: Manager Batch Upload
+      tags:
+      - sync
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncUploadRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncUploadResponse'
+          description: ''
+        '400':
+          description: Validation error or batch size exceeded
+        '403':
+          description: Unauthorized mess or blocked version
+  /api/v1/upload:
+    post:
+      operationId: upload_create
+      description: Synchronizes offline transactions uploaded by Mess Managers [SPEC
+        SDD §67, §68]. Processes batched meal and extra transactions with per-transaction
+        idempotency, enforces 500-item limits, duplicate prevention, and returns delta
+        updates.
+      summary: Manager Batch Upload
+      tags:
+      - sync
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncUploadRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncUploadResponse'
+          description: ''
+        '400':
+          description: Validation error or batch size exceeded
+        '403':
+          description: Unauthorized mess or blocked version
   /health/live:
     get:
       operationId: health_live_retrieve
@@ -2230,6 +2444,9 @@ components:
       - start_date
       - total_amount
       - total_meals
+    BlankEnum:
+      enum:
+      - ''
     BulkRejectRequest:
       type: object
       properties:
@@ -2309,6 +2526,14 @@ components:
           maxLength: 20
       required:
       - new_hostel_code
+    EntityTypeEnum:
+      enum:
+      - MEAL
+      - EXTRA
+      type: string
+      description: |-
+        * `MEAL` - MEAL
+        * `EXTRA` - EXTRA
     ExtraItem:
       type: object
       properties:
@@ -3177,6 +3402,153 @@ components:
         version:
           type: integer
           description: Optimistic concurrency version
+    PauseCancelRequest:
+      type: object
+      description: Request schema for POST /api/v1/pauses/<id>/cancel [SPEC SDD §64,
+        DBDD §7].
+      properties:
+        reason:
+          type: string
+          default: ''
+          description: Optional cancellation reason
+          maxLength: 500
+    PauseMealSlot:
+      type: object
+      description: Serializer for pause activation slot traceability.
+      properties:
+        pause_slot_id:
+          type: integer
+          readOnly: true
+        slot_sequence:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: 'Sequence index: 1, 2, 3...'
+        meal_date:
+          type: string
+          format: date
+          readOnly: true
+        meal_type_code:
+          type: string
+          readOnly: true
+        meal_type_name:
+          type: string
+          readOnly: true
+        qualifies_for_activation:
+          type: boolean
+          description: True for Breakfast, Lunch, Dinner; False for Evening Snacks
+            [DBDD §7]
+        consumed_for_activation:
+          type: boolean
+          description: True once this slot's end time has passed
+      required:
+      - meal_date
+      - meal_type_code
+      - meal_type_name
+      - pause_slot_id
+      - slot_sequence
+    PauseRequestRequest:
+      type: object
+      description: Request schema for POST /api/v1/pauses [SPEC SDD §64, DBDD §7].
+      properties:
+        mess_id:
+          type: integer
+          description: Target mess ID
+        requested_start_date:
+          type: string
+          format: date
+          description: Requested start date (IST calendar)
+        requested_end_date:
+          type: string
+          format: date
+          description: Requested end date (IST calendar)
+      required:
+      - mess_id
+      - requested_end_date
+      - requested_start_date
+    PauseResponse:
+      type: object
+      description: Response schema for pause records [SPEC SDD §64, DBDD §7].
+      properties:
+        pause_id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        requested_start_date:
+          type: string
+          format: date
+          description: Requested start date (IST calendar)
+        requested_end_date:
+          type: string
+          format: date
+          description: Requested end date (IST calendar)
+        effective_start_date:
+          type: string
+          format: date
+          nullable: true
+          description: Calculated date of the first slot after third qualifying slot
+            [DEC-06]
+        effective_end_date:
+          type: string
+          format: date
+          nullable: true
+          description: Effective end date, equals requested_end_date unchanged [DBDD
+            §7, DBDD-AC-27]
+        activation_meal_date:
+          type: string
+          format: date
+          nullable: true
+          description: Date on which pause transitioned to ACTIVE
+        status:
+          $ref: '#/components/schemas/PauseResponseStatusEnum'
+        requested_at:
+          type: string
+          format: date-time
+          description: When student submitted the request (UTC)
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+        cancellation_reason:
+          type: string
+        meal_slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/PauseMealSlot'
+          readOnly: true
+        slots_remaining:
+          type: integer
+          readOnly: true
+      required:
+      - meal_slots
+      - mess_id
+      - pause_id
+      - requested_at
+      - requested_end_date
+      - requested_start_date
+      - slots_remaining
+      - student_id
+    PauseResponseStatusEnum:
+      enum:
+      - SCHEDULED
+      - ACTIVE
+      - CANCELLED
+      - COMPLETED
+      type: string
+      description: |-
+        * `SCHEDULED` - Scheduled
+        * `ACTIVE` - Active
+        * `CANCELLED` - Cancelled
+        * `COMPLETED` - Completed
     PendingVerification:
       type: object
       description: Serializer for pending verification assignments as seen by the
@@ -3297,6 +3669,14 @@ components:
       - email
       - new_password
       - otp
+    ResolutionEnum:
+      enum:
+      - ACCEPTED
+      - REJECTED
+      type: string
+      description: |-
+        * `ACCEPTED` - Accepted
+        * `REJECTED` - Rejected
     RotateSecretRequestRequest:
       type: object
       description: Request payload for POST /api/v1/qr/rotate (Super Admin only).
@@ -3644,6 +4024,137 @@ components:
       description: |-
         * `ACTIVE` - ACTIVE
         * `INACTIVE` - INACTIVE
+    SyncConflict:
+      type: object
+      properties:
+        conflict_id:
+          type: integer
+          readOnly: true
+        sync_transaction_id:
+          type: integer
+          readOnly: true
+        transaction_id:
+          type: string
+          format: uuid
+          readOnly: true
+        entity_type:
+          type: string
+          readOnly: true
+        conflict_type:
+          type: string
+          maxLength: 50
+        conflict_reason:
+          type: string
+        detected_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        resolved_by_user_id:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          nullable: true
+          readOnly: true
+        resolution:
+          oneOf:
+          - $ref: '#/components/schemas/ResolutionEnum'
+          - $ref: '#/components/schemas/BlankEnum'
+        resolution_notes:
+          type: string
+      required:
+      - conflict_id
+      - conflict_reason
+      - conflict_type
+      - detected_at
+      - entity_type
+      - resolved_by_user_id
+      - sync_transaction_id
+      - transaction_id
+    SyncTransactionItemRequest:
+      type: object
+      description: Represents a single offline transaction item submitted in a sync
+        batch.
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        entity_type:
+          $ref: '#/components/schemas/EntityTypeEnum'
+        client_created_at:
+          type: string
+          format: date-time
+        payload:
+          type: object
+          additionalProperties: {}
+      required:
+      - client_created_at
+      - entity_type
+      - payload
+      - transaction_id
+    SyncUploadRequestRequest:
+      type: object
+      description: |-
+        Request schema for POST /api/v1/sync/upload [SPEC SDD §67].
+        Includes DeviceId, ClientVersion, LastServerVersion, TrustedTimeMetadata, and Transactions[].
+      properties:
+        device_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        client_version:
+          type: string
+          minLength: 1
+          default: 1.0.0
+          maxLength: 50
+        last_server_version:
+          type: integer
+          minimum: 0
+          default: 0
+        trusted_time_metadata:
+          type: object
+          additionalProperties: {}
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncTransactionItemRequest'
+      required:
+      - device_id
+    SyncUploadResponse:
+      type: object
+      description: |-
+        Response schema for POST /api/v1/sync/upload [SPEC SDD §67].
+        Returns ServerTime, AuthorizationState, StudentChanges, ConfigurationChanges,
+        TransactionResults[], and NewSyncCursor.
+      properties:
+        server_time:
+          type: string
+          format: date-time
+        authorization_state:
+          type: string
+        student_changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        configuration_changes:
+          type: object
+          additionalProperties: {}
+        transaction_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionResultItem'
+        new_sync_cursor:
+          type: integer
+      required:
+      - authorization_state
+      - configuration_changes
+      - new_sync_cursor
+      - server_time
+      - student_changes
+      - transaction_results
     SystemSettingUpdateRequest:
       type: object
       properties:
@@ -3664,6 +4175,42 @@ components:
       required:
       - key
       - value
+    TransactionResultItem:
+      type: object
+      description: Per-transaction processing outcome in sync response [SPEC DBDD
+        §11.1].
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/TransactionResultItemStatusEnum'
+        result_code:
+          type: string
+          default: ''
+        result_message:
+          type: string
+          default: ''
+        entity_id:
+          type: string
+          default: ''
+      required:
+      - status
+      - transaction_id
+    TransactionResultItemStatusEnum:
+      enum:
+      - SYNCHRONIZED
+      - IDEMPOTENT_SUCCESS
+      - DUPLICATE
+      - CONFLICT
+      - REJECTED
+      type: string
+      description: |-
+        * `SYNCHRONIZED` - SYNCHRONIZED
+        * `IDEMPOTENT_SUCCESS` - IDEMPOTENT_SUCCESS
+        * `DUPLICATE` - DUPLICATE
+        * `CONFLICT` - CONFLICT
+        * `REJECTED` - REJECTED
     TransferStudentRequest:
       type: object
       properties:

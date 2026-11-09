@@ -28,7 +28,7 @@ from apps.identity.models import DeviceRegistration, User
 from apps.identity.selectors import get_user_role
 from apps.mess.models import ExtraItem, MealOccurrence, MealType, Mess, MessManagerAssignment
 from apps.mess.services import get_clerk_scope, get_extra_price, get_manager_scope, get_meal_rate
-from apps.pause.models import MessPause
+from apps.pause.services import cancel_active_pause_on_meal
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -236,29 +236,6 @@ def record_meal(
             transaction_id=transaction_id,
         )
 
-    # Step 6: Pause check (Owner change D23 / DBDD-AC-27)
-    active_pause = MessPause.objects.filter(student=student_obj, status="ACTIVE").first()
-    if active_pause:
-        p_start = active_pause.effective_start_date or active_pause.requested_start_date
-        p_end = active_pause.effective_end_date or active_pause.requested_end_date
-        if p_start <= meal_date <= p_end:
-            # Meal is accepted, pause is cancelled
-            active_pause.status = "CANCELLED"
-            active_pause.cancellation_reason = "MEAL_TAKEN"
-            active_pause.cancelled_at = clock.now()
-            active_pause.save(update_fields=["status", "cancellation_reason", "cancelled_at", "updated_at", "version"])
-
-            record_audit_event(
-                event_type="PAUSE_CANCELLED",
-                actor_user=recorded_by_user,
-                entity_type="MessPause",
-                entity_id=active_pause.pause_id,
-                reason="MEAL_TAKEN",
-                old_values={"status": "ACTIVE"},
-                new_values={"status": "CANCELLED", "cancellation_reason": "MEAL_TAKEN"},
-                correlation_id=correlation_id,
-            )
-
     # Step 7: Billing Period lock check (DEC-05)
     # Note: A late meal is accepted and recorded; it does not change a locked bill (handled at billing generation)
     # So we proceed normally.
@@ -287,6 +264,17 @@ def record_meal(
 
     try:
         with transaction.atomic():
+            # Step 6: Pause check (Owner change D23 / DBDD-AC-27). The meal is
+            # accepted; the same transaction cancels the remainder of an ACTIVE pause
+            # from this meal's slot. Earlier slots stay paused.
+            cancel_active_pause_on_meal(
+                student=student_obj,
+                occurrence=occurrence,
+                actor=recorded_by_user,
+                transaction_id=transaction_id,
+                correlation_id=correlation_id,
+            )
+
             meal = MealConsumption.objects.create(
                 transaction_id=transaction_id,
                 student=student_obj,

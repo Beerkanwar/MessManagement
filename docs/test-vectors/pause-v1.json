@@ -1,0 +1,154 @@
+{
+  "version": 1,
+  "protocol": "pause-activation-v1",
+  "description": "Shared pause activation vectors. Breakfast, Lunch and Dinner count; Evening Snacks are walked over but never count. Effective start is the next qualifying slot after the third counted slot [DBDD §7, DEC-06].",
+  "meal_end_times_ist": {
+    "BREAKFAST": "10:00",
+    "LUNCH": "14:30",
+    "EVENING_SNACKS": "18:30",
+    "DINNER": "22:00"
+  },
+  "meal_sequence": {
+    "BREAKFAST": 1,
+    "LUNCH": 2,
+    "EVENING_SNACKS": 3,
+    "DINNER": 4
+  },
+  "cases": [
+    {
+      "name": "three_core_slots_with_snacks_between",
+      "request_time_ist": "2026-11-09T06:00:00+05:30",
+      "requested_start_date": "2026-11-10",
+      "occurrences": [
+        { "meal_date": "2026-11-10", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-10", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-10", "meal_type": "EVENING_SNACKS" },
+        { "meal_date": "2026-11-10", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-11", "meal_type": "BREAKFAST" }
+      ],
+      "expected": {
+        "counted": [
+          ["2026-11-10", "BREAKFAST"],
+          ["2026-11-10", "LUNCH"],
+          ["2026-11-10", "DINNER"]
+        ],
+        "skipped_snacks": [
+          ["2026-11-10", "EVENING_SNACKS"]
+        ],
+        "recorded": [
+          ["2026-11-10", "BREAKFAST"],
+          ["2026-11-10", "LUNCH"],
+          ["2026-11-10", "EVENING_SNACKS"],
+          ["2026-11-10", "DINNER"]
+        ],
+        "activation_meal_date": "2026-11-10",
+        "effective_start_date": "2026-11-11"
+      }
+    },
+    {
+      "name": "request_exactly_at_slot_end_skips_that_slot",
+      "request_time_ist": "2026-11-10T10:00:00+05:30",
+      "requested_start_date": "2026-11-10",
+      "occurrences": [
+        { "meal_date": "2026-11-10", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-10", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-10", "meal_type": "EVENING_SNACKS" },
+        { "meal_date": "2026-11-10", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-11", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-11", "meal_type": "LUNCH" }
+      ],
+      "expected": {
+        "counted": [
+          ["2026-11-10", "LUNCH"],
+          ["2026-11-10", "DINNER"],
+          ["2026-11-11", "BREAKFAST"]
+        ],
+        "skipped_snacks": [
+          ["2026-11-10", "EVENING_SNACKS"]
+        ],
+        "recorded": [
+          ["2026-11-10", "LUNCH"],
+          ["2026-11-10", "EVENING_SNACKS"],
+          ["2026-11-10", "DINNER"],
+          ["2026-11-11", "BREAKFAST"]
+        ],
+        "activation_meal_date": "2026-11-11",
+        "effective_start_date": "2026-11-11"
+      }
+    },
+    {
+      "name": "request_after_last_slot_starts_next_day",
+      "request_time_ist": "2026-11-10T22:30:00+05:30",
+      "requested_start_date": "2026-11-10",
+      "occurrences": [
+        { "meal_date": "2026-11-10", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-10", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-10", "meal_type": "EVENING_SNACKS" },
+        { "meal_date": "2026-11-10", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-11", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-11", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-11", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-12", "meal_type": "BREAKFAST" }
+      ],
+      "expected": {
+        "counted": [
+          ["2026-11-11", "BREAKFAST"],
+          ["2026-11-11", "LUNCH"],
+          ["2026-11-11", "DINNER"]
+        ],
+        "skipped_snacks": [],
+        "recorded": [
+          ["2026-11-11", "BREAKFAST"],
+          ["2026-11-11", "LUNCH"],
+          ["2026-11-11", "DINNER"]
+        ],
+        "activation_meal_date": "2026-11-11",
+        "effective_start_date": "2026-11-12"
+      }
+    },
+    {
+      "name": "request_during_snacks_window_walks_over_snacks",
+      "request_time_ist": "2026-11-10T17:00:00+05:30",
+      "requested_start_date": "2026-11-10",
+      "occurrences": [
+        { "meal_date": "2026-11-10", "meal_type": "EVENING_SNACKS" },
+        { "meal_date": "2026-11-10", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-11", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-11", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-11", "meal_type": "DINNER" },
+        { "meal_date": "2026-11-12", "meal_type": "BREAKFAST" }
+      ],
+      "expected": {
+        "counted": [
+          ["2026-11-10", "DINNER"],
+          ["2026-11-11", "BREAKFAST"],
+          ["2026-11-11", "LUNCH"]
+        ],
+        "skipped_snacks": [
+          ["2026-11-10", "EVENING_SNACKS"]
+        ],
+        "recorded": [
+          ["2026-11-10", "EVENING_SNACKS"],
+          ["2026-11-10", "DINNER"],
+          ["2026-11-11", "BREAKFAST"],
+          ["2026-11-11", "LUNCH"]
+        ],
+        "activation_meal_date": "2026-11-11",
+        "effective_start_date": "2026-11-11"
+      }
+    },
+    {
+      "name": "fewer_than_four_qualifying_slots_is_refused",
+      "request_time_ist": "2026-11-09T06:00:00+05:30",
+      "requested_start_date": "2026-11-10",
+      "occurrences": [
+        { "meal_date": "2026-11-10", "meal_type": "BREAKFAST" },
+        { "meal_date": "2026-11-10", "meal_type": "LUNCH" },
+        { "meal_date": "2026-11-10", "meal_type": "DINNER" }
+      ],
+      "expected": {
+        "error_code": "INSUFFICIENT_QUALIFYING_SLOTS"
+      }
+    }
+  ]
+}
