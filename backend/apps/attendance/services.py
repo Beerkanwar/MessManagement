@@ -92,6 +92,9 @@ def record_meal(
     if isinstance(transaction_id, str):
         transaction_id = uuid.UUID(transaction_id)
 
+    if isinstance(meal_date, str):
+        meal_date = date.fromisoformat(meal_date)
+
     # Fast-path idempotency check before locking
     existing_by_txn = MealConsumption.objects.filter(transaction_id=transaction_id).first()
     if existing_by_txn:
@@ -494,6 +497,8 @@ def record_extra(
         )
 
     txn_ts = transaction_timestamp or clock.now()
+    if isinstance(txn_ts, str):
+        txn_ts = datetime.fromisoformat(txn_ts.replace("Z", "+00:00"))
     # Transaction IST date
     ist_date = txn_ts.astimezone(IST).date()
 

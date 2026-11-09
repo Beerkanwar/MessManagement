@@ -93,8 +93,9 @@ class DeviceBindingJWTAuthentication(authentication.BaseAuthentication):
                 code="device_not_found",
             )
 
-        # Invariant: Device session must be ACTIVE
-        if device.session_status != "ACTIVE":
+        # Invariant: Device session must not be REPLACED, REVOKED, or LOGGED_OUT
+        # REVOKE_PENDING_SYNC is allowed so the device can complete its final sync [SPEC SDD §11.1].
+        if device.session_status in ["REPLACED", "REVOKED", "LOGGED_OUT"]:
             raise AuthenticationFailed(
                 {
                     "code": ErrorCodes.DEVICE_REVOKED,
