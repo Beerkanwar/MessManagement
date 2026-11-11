@@ -4,7 +4,14 @@ Implements:
 - Feedback (insert-only, unique student + year + month [Invariant 6], ratings 1-5)
 """
 from django.db import models
+from django.db.models import TextField
+from django.db.models.functions import Length
+
 from apps.core.models import InsertOnlyModel
+
+# Length is a database function but not a registered lookup by default; the
+# feedback comment cap needs it in a CheckConstraint.
+TextField.register_lookup(Length)
 
 
 class Feedback(InsertOnlyModel):
@@ -28,7 +35,10 @@ class Feedback(InsertOnlyModel):
     taste_rating = models.IntegerField(
         help_text="Rating from 1 (poor) to 5 (excellent)"
     )
-    comments = models.TextField(blank=True, default="")
+    comments = models.TextField(
+        blank=True, default="", max_length=1000,
+        help_text="Optional free-text comments (plain text, up to 1,000 characters)",
+    )
 
     class Meta:
         db_table = "feedback_feedback"
@@ -51,6 +61,10 @@ class Feedback(InsertOnlyModel):
             models.CheckConstraint(
                 condition=models.Q(taste_rating__gte=1, taste_rating__lte=5),
                 name="feedback_taste_rating_check",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(comments__length__lte=1000),
+                name="feedback_comments_length_check",
             ),
         ]
         indexes = [

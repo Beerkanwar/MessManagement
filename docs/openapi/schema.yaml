@@ -1508,17 +1508,55 @@ paths:
                   $ref: '#/components/schemas/ExtraTransaction'
           description: ''
   /api/v1/feedback:
+    post:
+      operationId: feedback_create
+      description: Records the student's one immutable feedback response for the current
+        IST month. The mess is taken from the student's ACTIVE assignment and the
+        year/month from the server clock; the client sends neither. A second submission
+        in the same month returns 409 FEEDBACK_ALREADY_SUBMITTED [DBDD-AC-29].
+      summary: Submit Monthly Feedback
+      tags:
+      - feedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackSubmitRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feedback'
+          description: ''
+        '400':
+          description: Rating outside 1-5 or comments too long
+        '404':
+          description: No student profile or active assignment
+        '409':
+          description: Feedback already submitted this month
+  /api/v1/feedback/current:
     get:
-      operationId: feedback_retrieve
-      description: Lists submitted student mess feedback [SPEC DBDD §10].
-      summary: List Feedback
+      operationId: feedback_current_retrieve
+      description: Tells the app whether this month's response exists and shows it
+        read-only. The current month comes from the IST clock [DEC-01].
+      summary: Current Month Feedback Status
       tags:
       - feedback
       security:
       - jwtAuth: []
       responses:
         '200':
-          description: List of feedback records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCurrent'
+          description: ''
+        '404':
+          description: No student profile
   /api/v1/hostels:
     get:
       operationId: hostels_list
@@ -1703,8 +1741,9 @@ paths:
           description: ''
   /api/v1/menus:
     get:
-      operationId: menus_retrieve
-      description: Lists published and draft menus [SPEC DBDD §9].
+      operationId: menus_list
+      description: Lists monthly menus. A Hostel Clerk sees only their own hostel;
+        the Super Admin sees every hostel. Students use /menus/current.
       summary: List Menus
       tags:
       - menus
@@ -1712,7 +1751,342 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: List of menus
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Menu'
+          description: ''
+        '403':
+          description: Permission denied
+    post:
+      operationId: menus_create
+      description: Creates an empty DRAFT menu for one hostel and calendar month.
+        The combination of hostel, year and month is unique [SPEC DBDD §9].
+      summary: Create Monthly Menu
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuStructure'
+          description: ''
+        '404':
+          description: Hostel not found or out of scope
+        '409':
+          description: Menu already exists
+  /api/v1/menus/{menu_id}:
+    get:
+      operationId: menus_retrieve
+      description: Returns one menu shaped as Month -> Date -> Meal -> Items. Out-of-scope
+        menus return 404 so their existence is not revealed.
+      summary: Menu Detail
+      parameters:
+      - in: path
+        name: menu_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuStructure'
+          description: ''
+        '404':
+          description: Not found or out of scope
+  /api/v1/menus/{menu_id}/copy-previous:
+    post:
+      operationId: menus_copy_previous_create
+      description: Populates a DRAFT menu from the previous month's weekday pattern
+        [REC]. The first previous-month date for each weekday supplies that weekday's
+        meals.
+      summary: Copy Previous Month Pattern
+      parameters:
+      - in: path
+        name: menu_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuCopyPreviousRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuStructure'
+          description: ''
+        '404':
+          description: No previous menu, or out of scope
+        '409':
+          description: Not a draft or stale version
+  /api/v1/menus/{menu_id}/meals:
+    put:
+      operationId: menus_meals_update
+      description: Sets the complete item list of one (date, meal type) in one call.
+        An empty list clears the meal. Dates must fall inside the menu's month. The
+        database forbids the same food item twice in one MenuMeal [DBDD-AC-30]. Changes
+        to a PUBLISHED menu are audited as MENU_REVISED.
+      summary: Replace Menu Meal Items
+      parameters:
+      - in: path
+        name: menu_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuMealSetRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuStructure'
+          description: ''
+        '400':
+          description: Validation error
+        '404':
+          description: Not found or out of scope
+        '409':
+          description: Stale version
+    patch:
+      operationId: menus_meals_partial_update
+      description: Sets the complete item list of one (date, meal type) in one call.
+        An empty list clears the meal. Dates must fall inside the menu's month. The
+        database forbids the same food item twice in one MenuMeal [DBDD-AC-30]. Changes
+        to a PUBLISHED menu are audited as MENU_REVISED.
+      summary: Replace Menu Meal Items
+      parameters:
+      - in: path
+        name: menu_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedMenuMealSetRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuStructure'
+          description: ''
+        '400':
+          description: Validation error
+        '404':
+          description: Not found or out of scope
+        '409':
+          description: Stale version
+  /api/v1/menus/{menu_id}/publish:
+    post:
+      operationId: menus_publish_create
+      description: DRAFT -> PUBLISHED. Sets PublishedAt and PublishedBy and audits
+        MENU_PUBLISHED. Dates with no items are returned as warnings but do not block
+        publication because the specifications do not require full coverage.
+      summary: Publish Menu
+      parameters:
+      - in: path
+        name: menu_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MenuPublishRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MenuPublishResult'
+          description: ''
+        '404':
+          description: Not found or out of scope
+        '409':
+          description: Already published or stale version
+  /api/v1/menus/current:
+    get:
+      operationId: menus_current_retrieve
+      description: Returns the published menu of the student's hostel from today's
+        ACTIVE assignment for the current IST month, and the next month when already
+        published, shaped as Month -> Date -> Meal -> Items [SRS §22]. Earlier months
+        are never exposed.
+      summary: Current Published Menu
+      tags:
+      - menus
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentMenu'
+          description: ''
+        '403':
+          description: Students only
+        '404':
+          description: No student profile or active assignment
+  /api/v1/menus/food-items:
+    get:
+      operationId: menus_food_items_list
+      description: Lists the global reusable food-item master [SPEC DBDD §9]. Available
+        to menu authors (Hostel Clerk and Super Admin).
+      summary: List Food Items
+      tags:
+      - menus
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FoodItem'
+          description: ''
+    post:
+      operationId: menus_food_items_create
+      description: A Clerk or Super Admin adds a food item. Names are unique after
+        trimming and upper-casing [SPEC DBDD §9].
+      summary: Create Food Item
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FoodItemCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodItem'
+          description: ''
+        '409':
+          description: Duplicate normalized name
+  /api/v1/menus/food-items/{food_item_id}:
+    patch:
+      operationId: menus_food_items_partial_update
+      description: Super Admin renames a shared food item or edits its description.
+        Clerks may only add or pick items because one item is shared by every hostel's
+        menu [REC].
+      summary: Update Food Item
+      parameters:
+      - in: path
+        name: food_item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFoodItemUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodItem'
+          description: ''
+        '403':
+          description: Only the Super Admin may rename
+        '404':
+          description: Not found
+        '409':
+          description: Stale version or duplicate name
+  /api/v1/menus/food-items/{food_item_id}/deactivate:
+    post:
+      operationId: menus_food_items_deactivate_create
+      description: Super Admin deactivates a shared food item. Items are never hard-deleted
+        because historical menus reference them.
+      summary: Deactivate Food Item
+      parameters:
+      - in: path
+        name: food_item_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - menus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FoodItemDeactivateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FoodItem'
+          description: ''
+        '403':
+          description: Only the Super Admin may deactivate
+        '404':
+          description: Not found
+        '409':
+          description: Stale version
   /api/v1/messes:
     get:
       operationId: messes_list
@@ -3511,6 +3885,25 @@ components:
       - reason
       - reference
       - semester_id
+    CurrentMenu:
+      type: object
+      properties:
+        student_id:
+          type: integer
+          readOnly: true
+        hostel:
+          allOf:
+          - $ref: '#/components/schemas/HostelSummary'
+          readOnly: true
+        months:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuStructure'
+          readOnly: true
+      required:
+      - hostel
+      - months
+      - student_id
     EntityTypeEnum:
       enum:
       - MEAL_CONSUMPTION
@@ -3758,6 +4151,157 @@ components:
         * `SCAN_CONFIRMATION` - Scan Confirmation
         * `MANUAL` - Manual
         * `SYNC_RESOLUTION` - Sync Resolution
+    Feedback:
+      type: object
+      properties:
+        feedback_id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        mess_name:
+          type: string
+          readOnly: true
+        calendar_year:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar year
+        calendar_month:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar month (1-12)
+        food_quality_rating:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Rating from 1 (poor) to 5 (excellent)
+        taste_rating:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Rating from 1 (poor) to 5 (excellent)
+        comments:
+          type: string
+          description: Optional free-text comments (plain text, up to 1,000 characters)
+          maxLength: 1000
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+      required:
+      - calendar_month
+      - calendar_year
+      - created_at
+      - feedback_id
+      - food_quality_rating
+      - mess_code
+      - mess_id
+      - mess_name
+      - student_id
+      - taste_rating
+    FeedbackCurrent:
+      type: object
+      properties:
+        student_id:
+          type: integer
+          readOnly: true
+        calendar_year:
+          type: integer
+          readOnly: true
+        calendar_month:
+          type: integer
+          readOnly: true
+        submitted:
+          type: boolean
+          readOnly: true
+        feedback:
+          allOf:
+          - $ref: '#/components/schemas/Feedback'
+          readOnly: true
+          nullable: true
+      required:
+      - calendar_month
+      - calendar_year
+      - feedback
+      - student_id
+      - submitted
+    FeedbackSubmitRequest:
+      type: object
+      properties:
+        food_quality_rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        taste_rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comments:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - food_quality_rating
+      - taste_rating
+    FoodItem:
+      type: object
+      properties:
+        food_item_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          description: Item name
+          maxLength: 255
+        normalized_name:
+          type: string
+          description: Trimmed and uppercase for uniqueness [DBDD §9]
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/Status372Enum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - food_item_id
+      - name
+      - normalized_name
+    FoodItemCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          default: ''
+          maxLength: 2000
+      required:
+      - name
+    FoodItemDeactivateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - version
     ForgotPasswordRequestRequest:
       type: object
       properties:
@@ -3836,6 +4380,22 @@ components:
           description: Optimistic concurrency version
       required:
       - version
+    HostelSummary:
+      type: object
+      properties:
+        hostel_id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+      required:
+      - code
+      - hostel_id
+      - name
     ImportBatch:
       type: object
       properties:
@@ -4208,6 +4768,287 @@ components:
       - meal_type_id
       - name
       - sequence_no
+    MealTypeCodeEnum:
+      enum:
+      - BREAKFAST
+      - LUNCH
+      - EVENING_SNACKS
+      - DINNER
+      type: string
+      description: |-
+        * `BREAKFAST` - BREAKFAST
+        * `LUNCH` - LUNCH
+        * `EVENING_SNACKS` - EVENING_SNACKS
+        * `DINNER` - DINNER
+    Menu:
+      type: object
+      properties:
+        menu_id:
+          type: integer
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        menu_year:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar year
+        menu_month:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar month (1-12)
+        status:
+          $ref: '#/components/schemas/MenuStatusEnum'
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        published_by_user_id:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          nullable: true
+          readOnly: true
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - hostel_code
+      - hostel_id
+      - menu_id
+      - menu_month
+      - menu_year
+      - published_by_user_id
+    MenuCopyPreviousRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - version
+    MenuCreateRequest:
+      type: object
+      properties:
+        hostel_id:
+          type: integer
+          minimum: 1
+        year:
+          type: integer
+          maximum: 2100
+          minimum: 2000
+        month:
+          type: integer
+          maximum: 12
+          minimum: 1
+      required:
+      - hostel_id
+      - month
+      - year
+    MenuDayOutput:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          readOnly: true
+        meals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuMealOutput'
+          readOnly: true
+      required:
+      - date
+      - meals
+    MenuItemInputRequest:
+      type: object
+      properties:
+        food_item_id:
+          type: integer
+          minimum: 1
+        display_order:
+          type: integer
+          minimum: 1
+        notes:
+          type: string
+          default: ''
+          maxLength: 1000
+      required:
+      - food_item_id
+    MenuItemOutput:
+      type: object
+      properties:
+        menu_item_id:
+          type: integer
+          readOnly: true
+        food_item_id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          readOnly: true
+        display_order:
+          type: integer
+          readOnly: true
+        notes:
+          type: string
+          readOnly: true
+      required:
+      - display_order
+      - food_item_id
+      - menu_item_id
+      - name
+      - notes
+    MenuMealOutput:
+      type: object
+      properties:
+        menu_meal_id:
+          type: integer
+          readOnly: true
+        meal_type_id:
+          type: integer
+          readOnly: true
+        meal_type_code:
+          type: string
+          readOnly: true
+        meal_type_name:
+          type: string
+          readOnly: true
+        sequence_no:
+          type: integer
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItemOutput'
+          readOnly: true
+      required:
+      - items
+      - meal_type_code
+      - meal_type_id
+      - meal_type_name
+      - menu_meal_id
+      - sequence_no
+      - status
+    MenuMealSetRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        menu_date:
+          type: string
+          format: date
+        meal_type_code:
+          $ref: '#/components/schemas/MealTypeCodeEnum'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItemInputRequest'
+      required:
+      - items
+      - meal_type_code
+      - menu_date
+      - version
+    MenuPublishRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+      required:
+      - version
+    MenuPublishResult:
+      type: object
+      properties:
+        menu:
+          allOf:
+          - $ref: '#/components/schemas/MenuStructure'
+          readOnly: true
+        warnings:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - menu
+      - warnings
+    MenuStatusEnum:
+      enum:
+      - DRAFT
+      - PUBLISHED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `PUBLISHED` - Published
+    MenuStructure:
+      type: object
+      description: Month -> Date -> Meal -> Items response shape [App Flow §3.4].
+      properties:
+        menu_id:
+          type: integer
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        hostel_code:
+          type: string
+          readOnly: true
+        hostel_name:
+          type: string
+          readOnly: true
+        year:
+          type: integer
+          readOnly: true
+        month:
+          type: integer
+          readOnly: true
+        month_label:
+          type: string
+          readOnly: true
+        status:
+          type: string
+          readOnly: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by_user_id:
+          type: integer
+          readOnly: true
+          nullable: true
+        version:
+          type: integer
+          readOnly: true
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuDayOutput'
+          readOnly: true
+      required:
+      - days
+      - hostel_code
+      - hostel_id
+      - hostel_name
+      - menu_id
+      - month
+      - month_label
+      - published_at
+      - published_by_user_id
+      - status
+      - version
+      - year
     Mess:
       type: object
       properties:
@@ -4410,6 +5251,19 @@ components:
         period_end:
           type: string
           format: date
+    PatchedFoodItemUpdateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 2000
     PatchedHostelUpdateRequest:
       type: object
       properties:
@@ -4423,6 +5277,21 @@ components:
         version:
           type: integer
           description: Optimistic concurrency version
+    PatchedMenuMealSetRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        menu_date:
+          type: string
+          format: date
+        meal_type_code:
+          $ref: '#/components/schemas/MealTypeCodeEnum'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MenuItemInputRequest'
     PatchedStudentUpdateRequest:
       type: object
       properties:

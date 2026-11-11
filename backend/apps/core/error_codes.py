@@ -43,6 +43,7 @@ class ErrorCodes:
     BILLING_PERIOD_LOCKED = "BILLING_PERIOD_LOCKED"
     MEAL_NOT_SCHEDULED = "MEAL_NOT_SCHEDULED"
     CORRECTION_WINDOW_EXPIRED = "CORRECTION_WINDOW_EXPIRED"
+    FEEDBACK_ALREADY_SUBMITTED = "FEEDBACK_ALREADY_SUBMITTED"
 
     # 429 Throttling
     RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED"
@@ -134,6 +135,11 @@ ERROR_REGISTRY: dict[str, ErrorDefinition] = {
         code=ErrorCodes.BILLING_PERIOD_LOCKED,
         http_status=409,
         default_message="The billing period is locked and cannot be modified.",
+    ),
+    ErrorCodes.FEEDBACK_ALREADY_SUBMITTED: ErrorDefinition(
+        code=ErrorCodes.FEEDBACK_ALREADY_SUBMITTED,
+        http_status=409,
+        default_message="Feedback has already been submitted for this calendar month.",
     ),
     ErrorCodes.RATE_LIMIT_EXCEEDED: ErrorDefinition(
         code=ErrorCodes.RATE_LIMIT_EXCEEDED,
