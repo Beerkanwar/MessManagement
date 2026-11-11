@@ -736,6 +736,466 @@ paths:
           description: OTP verified successfully
         '400':
           description: Invalid OTP or attempts exceeded
+  /api/v1/billing/balances:
+    get:
+      operationId: billing_balances_list
+      description: Students read their own balance and ledger; the Super Admin reads
+        every account. Negative balances are normal [DBDD-AC-25].
+      summary: List Prepaid Balances
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+          description: ''
+        '403':
+          description: Permission denied
+  /api/v1/billing/balances/{student_id}/credits:
+    post:
+      operationId: billing_balances_credits_create
+      description: Super Admin posts a CREDIT entry with a mandatory reference and
+        reason.
+      summary: Add Authorized Credit
+      parameters:
+      - in: path
+        name: student_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+          description: ''
+        '404':
+          description: Account not found
+  /api/v1/billing/bills:
+    get:
+      operationId: billing_bills_list
+      description: Students see their own bills only once LOCKED; Clerks see their
+        hostel's generated, reviewed and locked bills; Super Admin sees all [Phase
+        10 build 9].
+      summary: List Bills
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bill'
+          description: ''
+        '403':
+          description: Permission denied
+  /api/v1/billing/bills/{bill_id}:
+    get:
+      operationId: billing_bills_retrieve
+      description: Returns one bill with its calculation lines and adjustments.
+      summary: Bill Detail
+      parameters:
+      - in: path
+        name: bill_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+          description: ''
+        '404':
+          description: Not found
+  /api/v1/billing/bills/{bill_id}/adjustments:
+    post:
+      operationId: billing_bills_adjustments_create
+      description: Super Admin appends a positive FEE or FINE with a mandatory reason.
+        Nothing can reduce a bill; locked periods are rejected [C01, SRS §20].
+      summary: Append Bill Adjustment
+      parameters:
+      - in: path
+        name: bill_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillAdjustmentCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+          description: ''
+        '400':
+          description: Validation error
+        '409':
+          description: Billing period locked
+  /api/v1/billing/opening-balances:
+    get:
+      operationId: billing_opening_balances_list
+      description: Super Admin lists every student balance account.
+      summary: List Opening Balances
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+          description: ''
+    post:
+      operationId: billing_opening_balances_create
+      description: Super Admin creates one student's prepaid account with its single
+        OPENING entry, using the college fee system's figure [SRS §18].
+      summary: Set Opening Balance
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpeningBalanceRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+          description: ''
+        '409':
+          description: Account already exists
+  /api/v1/billing/opening-balances/import:
+    post:
+      operationId: billing_opening_balances_import_create
+      description: 'Atomically imports a UTF-8 CSV with roll_number and amount columns,
+        using the Phase 4 staging pattern: no row is written unless every row is valid.'
+      summary: Import Opening Balances
+      tags:
+      - billing
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OpeningBalanceImportRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpeningBalanceImportRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: Import summary
+        '400':
+          description: Validation errors; nothing was imported
+  /api/v1/billing/periods:
+    get:
+      operationId: billing_periods_list
+      description: Lists billing periods and their lifecycle states [SPEC DBDD §8].
+      summary: List Billing Periods
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+  /api/v1/billing/periods/{billing_period_id}:
+    get:
+      operationId: billing_periods_retrieve
+      description: Returns one period with summary totals, the count of transactions
+        recorded since generation, and the generation pre-flight [Phase 10 build 5].
+      summary: Billing Period Detail
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '404':
+          description: Not found
+    patch:
+      operationId: billing_periods_partial_update
+      description: Super Admin adjusts the dates of an OPEN period [SDD §151]; audited.
+      summary: Adjust Billing Period Dates
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBillingPeriodUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '400':
+          description: Validation error
+  /api/v1/billing/periods/{billing_period_id}/generate:
+    post:
+      operationId: billing_periods_generate_create
+      description: Generates or regenerates every student-and-mess bill for the period
+        [C01, DEC-04, DEC-24]. The run is resumable and idempotent.
+      summary: Generate Bills
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '400':
+          description: Validation error
+  /api/v1/billing/periods/{billing_period_id}/lock:
+    post:
+      operationId: billing_periods_lock_create
+      description: REVIEWED -> LOCKED. Posts one BILL_CHARGE per bill and makes the
+        snapshot immutable at the database level [DBDD-AC-22].
+      summary: Lock Billing Period
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '409':
+          description: Invalid state or stale
+  /api/v1/billing/periods/{billing_period_id}/review:
+    post:
+      operationId: billing_periods_review_create
+      description: BILL_GENERATED -> REVIEWED; bills become FINAL.
+      summary: Review Bills
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '409':
+          description: Invalid state
+  /api/v1/billing/periods/{billing_period_id}/unlock:
+    post:
+      operationId: billing_periods_unlock_create
+      description: LOCKED -> REVIEWED with a mandatory reason. Posts a BILL_REVERSAL
+        per earlier charge and audits the previous and new state [DBDD-AC-23].
+      summary: Unlock Billing Period
+      parameters:
+      - in: path
+        name: billing_period_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnlockPeriodRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPeriod'
+          description: ''
+        '400':
+          description: Missing reason
+        '409':
+          description: Invalid state
+  /api/v1/billing/policies:
+    get:
+      operationId: billing_policies_list
+      description: Lists effective-dated minimum-diet policies per mess [DEC-04a].
+      summary: List Billing Policies
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BillingPolicy'
+          description: ''
+    post:
+      operationId: billing_policies_create
+      description: Super Admin creates a new policy version. A new version closes
+        the previous open row at its own effective_from; back-dated versions are refused.
+      summary: Create Billing Policy
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BillingPolicyCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPolicy'
+          description: ''
+        '400':
+          description: Validation error
+  /api/v1/billing/semesters:
+    get:
+      operationId: billing_semesters_list
+      description: Lists institutional semesters used to key prepaid balances [SPEC
+        DBDD §8].
+      summary: List Semesters
+      tags:
+      - billing
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Semester'
+          description: ''
+    post:
+      operationId: billing_semesters_create
+      description: Super Admin creates a semester [ImplementationGuide Phase 10 build
+        1].
+      summary: Create Semester
+      tags:
+      - billing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SemesterCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Semester'
+          description: ''
+        '400':
+          description: Validation error
   /api/v1/devices/current:
     get:
       operationId: devices_current_retrieve
@@ -1576,18 +2036,6 @@ paths:
           description: ''
         '400':
           description: Validation error
-  /api/v1/periods:
-    get:
-      operationId: periods_retrieve
-      description: Lists billing periods and their lifecycle states [SPEC DBDD §8].
-      summary: List Billing Periods
-      tags:
-      - billing
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          description: List of billing periods
   /api/v1/qr/rotate:
     post:
       operationId: qr_rotate_create
@@ -2512,6 +2960,454 @@ components:
       - start_date
       - total_amount
       - total_meals
+    Balance:
+      type: object
+      properties:
+        balance_account_id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        student_roll_number:
+          type: string
+          readOnly: true
+        student_name:
+          type: string
+          readOnly: true
+        semester_id:
+          type: integer
+          readOnly: true
+        semester_code:
+          type: string
+          readOnly: true
+        opening_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        credits_total:
+          type: string
+          readOnly: true
+        charges_total:
+          type: string
+          readOnly: true
+        current_balance:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Derived cached balance, may be negative [DBDD §8, Invariant
+            25]
+        last_calculated_at:
+          type: string
+          format: date-time
+          nullable: true
+        entries:
+          type: array
+          items: {}
+          readOnly: true
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - balance_account_id
+      - charges_total
+      - credits_total
+      - entries
+      - semester_code
+      - semester_id
+      - student_id
+      - student_name
+      - student_roll_number
+    Bill:
+      type: object
+      properties:
+        bill_id:
+          type: integer
+          readOnly: true
+        student_id:
+          type: integer
+          readOnly: true
+        student_roll_number:
+          type: string
+          readOnly: true
+        student_name:
+          type: string
+          readOnly: true
+        hostel_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        billing_period_id:
+          type: integer
+          readOnly: true
+        period_year:
+          type: integer
+          readOnly: true
+        period_month:
+          type: integer
+          readOnly: true
+        period_status:
+          type: string
+          readOnly: true
+        semester_id:
+          type: integer
+          nullable: true
+          readOnly: true
+        semester_code:
+          type: string
+          readOnly: true
+          nullable: true
+        meal_component_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: MAX(minimum_diet_count_snapshot, actual_meal_count) * common_diet_rate_snapshot
+            [C01]
+        extra_charges_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Sum of extra transactions in period
+        adjustment_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Sum of FEE and FINE adjustments (non-negative additions only)
+            [C01]
+        final_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: meal_component_amount + extra_charges_amount + adjustment_amount
+            [C01]
+        common_diet_rate_snapshot:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Rate snapshot at generation [DBDD §8.1]
+        minimum_diet_count_snapshot:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Billed minimum count after pause deduction [DEC-04]
+        actual_meal_count:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Count of qualifying meals consumed in period [C01]
+        status:
+          $ref: '#/components/schemas/BillStatusEnum'
+        generated_at:
+          type: string
+          format: date-time
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillLine'
+          readOnly: true
+        adjustments:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillAdjustment'
+          readOnly: true
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - adjustments
+      - bill_id
+      - billing_period_id
+      - common_diet_rate_snapshot
+      - extra_charges_amount
+      - final_amount
+      - generated_at
+      - hostel_id
+      - lines
+      - meal_component_amount
+      - mess_code
+      - mess_id
+      - minimum_diet_count_snapshot
+      - period_month
+      - period_status
+      - period_year
+      - semester_code
+      - semester_id
+      - student_id
+      - student_name
+      - student_roll_number
+    BillAdjustment:
+      type: object
+      properties:
+        adjustment_id:
+          type: integer
+          readOnly: true
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+          description: Adjustment amount, strictly > 0 [C01]
+        adjustment_type:
+          allOf:
+          - $ref: '#/components/schemas/BillAdjustmentAdjustmentTypeEnum'
+          description: |-
+            FEE or FINE only; additions only [C01]
+
+            * `FEE` - Fee
+            * `FINE` - Fine
+        reason:
+          type: string
+          description: Mandatory reason for fee or fine
+        created_by:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+        created_by_name:
+          type: string
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Timestamp when row was created (UTC)
+      required:
+      - adjustment_id
+      - adjustment_type
+      - amount
+      - created_at
+      - created_by
+      - created_by_name
+      - reason
+    BillAdjustmentAdjustmentTypeEnum:
+      enum:
+      - FEE
+      - FINE
+      type: string
+      description: |-
+        * `FEE` - Fee
+        * `FINE` - Fine
+    BillAdjustmentCreateAdjustmentTypeEnum:
+      enum:
+      - FEE
+      - FINE
+      type: string
+      description: |-
+        * `FEE` - FEE
+        * `FINE` - FINE
+    BillAdjustmentCreateRequest:
+      type: object
+      properties:
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        adjustment_type:
+          $ref: '#/components/schemas/BillAdjustmentCreateAdjustmentTypeEnum'
+        reason:
+          type: string
+          minLength: 1
+      required:
+      - adjustment_type
+      - amount
+      - reason
+    BillLine:
+      type: object
+      properties:
+        bill_line_id:
+          type: integer
+          readOnly: true
+        line_type:
+          $ref: '#/components/schemas/LineTypeEnum'
+        source_entity_type:
+          type: string
+          maxLength: 50
+        source_entity_id:
+          type: string
+          maxLength: 50
+        description:
+          type: string
+        quantity:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+        unit_rate:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        calculation_order:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - amount
+      - bill_line_id
+      - description
+      - line_type
+    BillStatusEnum:
+      enum:
+      - DRAFT
+      - FINAL
+      - LOCKED
+      type: string
+      description: |-
+        * `DRAFT` - Draft
+        * `FINAL` - Final
+        * `LOCKED` - Locked
+    BillingPeriod:
+      type: object
+      properties:
+        billing_period_id:
+          type: integer
+          readOnly: true
+        year:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar year (e.g. 2026)
+        month:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Calendar month (1-12)
+        period_start:
+          type: string
+          format: date
+          description: First date of month
+        period_end:
+          type: string
+          format: date
+          description: Last date of month
+        status:
+          $ref: '#/components/schemas/BillingPeriodStatusEnum'
+        opened_at:
+          type: string
+          format: date-time
+          readOnly: true
+        generated_at:
+          type: string
+          format: date-time
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        locked_at:
+          type: string
+          format: date-time
+          nullable: true
+        locked_by:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          nullable: true
+        unlocked_at:
+          type: string
+          format: date-time
+          nullable: true
+        unlocked_by:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          nullable: true
+        unlock_reason:
+          type: string
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - billing_period_id
+      - month
+      - opened_at
+      - period_end
+      - period_start
+      - year
+    BillingPeriodStatusEnum:
+      enum:
+      - OPEN
+      - BILL_GENERATED
+      - REVIEWED
+      - LOCKED
+      type: string
+      description: |-
+        * `OPEN` - Open
+        * `BILL_GENERATED` - Bill Generated
+        * `REVIEWED` - Reviewed
+        * `LOCKED` - Locked
+    BillingPolicy:
+      type: object
+      properties:
+        billing_policy_id:
+          type: integer
+          readOnly: true
+        mess_id:
+          type: integer
+          readOnly: true
+        mess_code:
+          type: string
+          readOnly: true
+        minimum_diet_count:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+          description: Base minimum diet count for students in this mess [DBDD §8]
+        effective_from:
+          type: string
+          format: date
+          description: Start date of policy (inclusive)
+        effective_to:
+          type: string
+          format: date
+          nullable: true
+          description: End date of policy (inclusive, null=open-ended)
+        policy_version:
+          type: integer
+          maximum: 2147483647
+          minimum: -2147483648
+      required:
+      - billing_policy_id
+      - effective_from
+      - mess_code
+      - mess_id
+      - minimum_diet_count
+    BillingPolicyCreateRequest:
+      type: object
+      properties:
+        mess_id:
+          type: integer
+          minimum: 1
+        minimum_diet_count:
+          type: integer
+          minimum: 0
+        effective_from:
+          type: string
+          format: date
+        effective_to:
+          type: string
+          format: date
+          nullable: true
+      required:
+      - effective_from
+      - mess_id
+      - minimum_diet_count
     BlankEnum:
       enum:
       - ''
@@ -2594,6 +3490,27 @@ components:
           maxLength: 20
       required:
       - new_hostel_code
+    CreditRequest:
+      type: object
+      properties:
+        semester_id:
+          type: integer
+          minimum: 1
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        reference:
+          type: string
+          minLength: 1
+        reason:
+          type: string
+          minLength: 1
+      required:
+      - amount
+      - reason
+      - reference
+      - semester_id
     EntityTypeEnum:
       enum:
       - MEAL_CONSUMPTION
@@ -3001,6 +3918,16 @@ components:
       - error_message
       - raw_row_data
       - row_number
+    LineTypeEnum:
+      enum:
+      - MINIMUM_DIET
+      - EXTRA
+      - ADJUSTMENT
+      type: string
+      description: |-
+        * `MINIMUM_DIET` - Minimum Diet
+        * `EXTRA` - Extra
+        * `ADJUSTMENT` - Adjustment
     LoginRequestRequest:
       type: object
       properties:
@@ -3437,6 +4364,52 @@ components:
       required:
       - name
       - version
+    OpeningBalanceImportRequest:
+      type: object
+      properties:
+        semester_id:
+          type: integer
+          minimum: 1
+        file:
+          type: string
+          format: binary
+      required:
+      - file
+      - semester_id
+    OpeningBalanceRequest:
+      type: object
+      properties:
+        student_id:
+          type: integer
+          minimum: 1
+        semester_id:
+          type: integer
+          minimum: 1
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,15}(?:\.\d{0,4})?$
+        reference:
+          type: string
+          default: ''
+        description:
+          type: string
+          default: ''
+      required:
+      - amount
+      - semester_id
+      - student_id
+    PatchedBillingPeriodUpdateRequest:
+      type: object
+      properties:
+        version:
+          type: integer
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
     PatchedHostelUpdateRequest:
       type: object
       properties:
@@ -3804,6 +4777,90 @@ components:
       - old_version
       - roll_number
       - student_id
+    Semester:
+      type: object
+      properties:
+        semester_id:
+          type: integer
+          readOnly: true
+        code:
+          type: string
+          description: e.g. 'AUTUMN-2026'
+          maxLength: 50
+        name:
+          type: string
+          description: e.g. 'Autumn Semester 2026-27'
+          maxLength: 100
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          $ref: '#/components/schemas/SemesterStatusEnum'
+        version:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
+          description: Optimistic concurrency control version counter
+      required:
+      - code
+      - end_date
+      - name
+      - semester_id
+      - start_date
+    SemesterCreateRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        status:
+          allOf:
+          - $ref: '#/components/schemas/SemesterCreateStatusEnum'
+          default: UPCOMING
+      required:
+      - code
+      - end_date
+      - name
+      - start_date
+    SemesterCreateStatusEnum:
+      enum:
+      - UPCOMING
+      - ACTIVE
+      - COMPLETED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `UPCOMING` - UPCOMING
+        * `ACTIVE` - ACTIVE
+        * `COMPLETED` - COMPLETED
+        * `ARCHIVED` - ARCHIVED
+    SemesterStatusEnum:
+      enum:
+      - UPCOMING
+      - ACTIVE
+      - COMPLETED
+      - ARCHIVED
+      type: string
+      description: |-
+        * `UPCOMING` - Upcoming
+        * `ACTIVE` - Active
+        * `COMPLETED` - Completed
+        * `ARCHIVED` - Archived
     Status372Enum:
       enum:
       - ACTIVE
@@ -4354,6 +5411,14 @@ components:
       - effective_from
       - new_hostel_code
       - new_mess_code
+    UnlockPeriodRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 1
+      required:
+      - reason
     UpdateDeviceMetadataRequest:
       type: object
       properties:

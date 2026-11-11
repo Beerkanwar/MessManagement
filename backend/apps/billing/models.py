@@ -13,6 +13,8 @@ Triggers for locked-bill guards and insert-only tables are added via migrations.
 """
 from django.conf import settings
 from django.db import models
+from django.db.models import F, Q
+from django.db.models.functions import Greatest
 from apps.core.models import TimeStampedModel, VersionedModel, InsertOnlyModel
 
 
@@ -232,6 +234,35 @@ class Bill(VersionedModel):
                 condition=models.Q(status__in=["DRAFT", "FINAL", "LOCKED"]),
                 name="billing_bill_status_check",
             ),
+            # C01: MealComponent = MAX(billed minimum, actual meal count) x rate.
+            models.CheckConstraint(
+                condition=models.Q(
+                    meal_component_amount=Greatest(
+                        F("minimum_diet_count_snapshot"), F("actual_meal_count")
+                    ) * F("common_diet_rate_snapshot")
+                ),
+                name="billing_bill_meal_component_formula_check",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(meal_component_amount__gte=0),
+                name="billing_bill_meal_component_non_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(extra_charges_amount__gte=0),
+                name="billing_bill_extra_charges_non_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(final_amount__gte=0),
+                name="billing_bill_final_amount_non_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(minimum_diet_count_snapshot__gte=0),
+                name="billing_bill_minimum_count_non_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(actual_meal_count__gte=0),
+                name="billing_bill_meal_count_non_neg",
+            ),
         ]
         indexes = [
             models.Index(fields=["billing_period", "mess"], name="idx_billing_bill_period_mess"),
@@ -273,6 +304,14 @@ class BillLine(models.Model):
             models.CheckConstraint(
                 condition=models.Q(line_type__in=["MINIMUM_DIET", "EXTRA", "ADJUSTMENT"]),
                 name="billing_bill_line_type_check",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(amount__gte=0),
+                name="billing_bill_line_amount_non_neg",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(quantity__gte=0),
+                name="billing_bill_line_quantity_non_neg",
             ),
         ]
 
@@ -318,6 +357,11 @@ class BillAdjustment(InsertOnlyModel):
             models.CheckConstraint(
                 condition=models.Q(adjustment_type__in=["FEE", "FINE"]),
                 name="billing_bill_adjustment_type_check",
+            ),
+            # C01: a fee or fine always carries a mandatory reason.
+            models.CheckConstraint(
+                condition=~Q(reason=""),
+                name="billing_bill_adjustment_reason_required",
             ),
         ]
 
@@ -399,6 +443,17 @@ class BalanceLedgerEntry(InsertOnlyModel):
             models.CheckConstraint(
                 condition=models.Q(entry_type__in=["OPENING", "CREDIT", "BILL_CHARGE", "BILL_REVERSAL"]),
                 name="billing_ledger_entry_type_check",
+            ),
+            # DBDD §8: credits are positive and charges are negative.
+            models.CheckConstraint(
+                condition=(
+                    Q(entry_type="BILL_CHARGE", amount__lte=0)
+                    | Q(
+                        entry_type__in=["OPENING", "CREDIT", "BILL_REVERSAL"],
+                        amount__gte=0,
+                    )
+                ),
+                name="billing_ledger_signed_amount_check",
             ),
         ]
         indexes = [
