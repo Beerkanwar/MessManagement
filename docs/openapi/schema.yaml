@@ -2463,8 +2463,10 @@ paths:
           description: 'Forbidden: Non-students or inactive device'
   /api/v1/reports:
     get:
-      operationId: reports_retrieve
-      description: Lists available institutional reports per user role [DEC-15].
+      operationId: reports_catalog
+      description: Lists the reports the authenticated caller may run, with their
+        columns, supported filters and export formats. Students are refused entirely
+        [DEC-15].
       summary: List Reports Catalog
       tags:
       - reports
@@ -2472,7 +2474,108 @@ paths:
       - jwtAuth: []
       responses:
         '200':
-          description: Reports list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportCatalogResponse'
+          description: ''
+  /api/v1/reports/{report_id}:
+    get:
+      operationId: reports_run
+      description: Runs one report for the required inclusive date range. JSON responses
+        are paginated and include totals/groups. CSV, XLSX and PDF responses export
+        the full result (capped at 100,000 rows for CSV/XLSX and 5,000 for PDF) and
+        write a REPORT_EXPORTED audit event.
+      summary: Run or Export a Report
+      parameters:
+      - in: query
+        name: extra_item
+        schema:
+          type: integer
+        description: Optional extra item id filter.
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - csv
+          - json
+          - pdf
+          - xlsx
+        description: Response format. JSON is paginated; file exports stream the full
+          result.
+      - in: query
+        name: from
+        schema:
+          type: string
+          format: date
+        description: First date of the report range (inclusive, ISO YYYY-MM-DD).
+        required: true
+      - in: query
+        name: hostel
+        schema:
+          type: integer
+        description: Optional hostel id filter (scope still applies).
+      - in: path
+        name: id
+        schema:
+          type: string
+        description: Report id from GET /reports.
+        required: true
+      - in: query
+        name: meal_type
+        schema:
+          type: string
+        description: Meal type code or id (BREAKFAST, LUNCH, EVENING_SNACKS, DINNER).
+      - in: query
+        name: mess
+        schema:
+          type: integer
+        description: Optional mess id filter (scope still applies).
+      - in: query
+        name: page
+        schema:
+          type: integer
+        description: JSON page number (default 1).
+      - in: query
+        name: page_size
+        schema:
+          type: integer
+        description: JSON page size (default 50, maximum 200).
+      - in: path
+        name: report_id
+        schema:
+          type: string
+        required: true
+      - in: query
+        name: student
+        schema:
+          type: integer
+        description: Optional student id filter.
+      - in: query
+        name: to
+        schema:
+          type: string
+          format: date
+        description: Last date of the report range (inclusive, ISO YYYY-MM-DD).
+        required: true
+      tags:
+      - reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJsonResponse'
+          description: Paginated JSON report, or a CSV/XLSX/PDF attachment.
+        '400':
+          description: Invalid range, filter, format or export row cap.
+        '403':
+          description: Role is not permitted to run this report.
+        '404':
+          description: Unknown report id.
   /api/v1/students:
     get:
       operationId: students_list
@@ -5563,6 +5666,106 @@ components:
         notes:
           type: string
           default: ''
+    ReportCatalogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        filters:
+          type: array
+          items:
+            type: string
+        formats:
+          type: array
+          items:
+            type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportColumn'
+      required:
+      - columns
+      - filters
+      - formats
+      - id
+      - roles
+      - title
+    ReportCatalogResponse:
+      type: object
+      properties:
+        reports:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportCatalogEntry'
+      required:
+      - reports
+    ReportColumn:
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        money:
+          type: boolean
+      required:
+      - key
+      - label
+      - money
+      - type
+    ReportJsonResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        next:
+          type: string
+          nullable: true
+        previous:
+          type: string
+          nullable: true
+        report:
+          type: string
+        title:
+          type: string
+        from_date:
+          type: string
+          format: date
+        to_date:
+          type: string
+          format: date
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+        totals:
+          type: object
+          additionalProperties: {}
+        groups:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+      required:
+      - count
+      - from_date
+      - groups
+      - next
+      - previous
+      - report
+      - results
+      - title
+      - to_date
+      - totals
     ResetPasswordRequestRequest:
       type: object
       properties:

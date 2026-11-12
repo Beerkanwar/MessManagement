@@ -169,6 +169,9 @@ REST_FRAMEWORK = {
     # Pagination: default 50, max 200 [ImplementationGuide Phase 1]
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPageNumberPagination",
     "PAGE_SIZE": 50,
+    # Reports use ?format=json|csv|xlsx|pdf [ImplementationGuide Phase 12], so
+    # DRF must not treat that query parameter as a renderer override.
+    "URL_FORMAT_OVERRIDE": None,
     # DRF exception handler returning {code, message, traceId} [SPEC SDD §88, §89]
     "EXCEPTION_HANDLER": "apps.core.exceptions.custom_exception_handler",
     # Throttling limits shared across workers using DB cache [REC]
