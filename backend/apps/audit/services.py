@@ -44,6 +44,32 @@ def sanitize_audit_payload(data: Any) -> Any:
     return data
 
 
+def redact_audit_payload_for_output(data: Any) -> Any:
+    """
+    Second-pass sanitizer for audit reads [ImplementationGuide Phase 13].
+
+    Stored payloads are already sanitized on write. This pass protects the read
+    API against legacy rows written before the write-side denylist, replacing
+    any secret-looking value rather than failing the whole listing.
+    """
+    if data is None:
+        return None
+    if isinstance(data, dict):
+        return {
+            key: (
+                "[REDACTED]"
+                if is_sensitive_key(str(key))
+                else redact_audit_payload_for_output(value)
+            )
+            for key, value in data.items()
+        }
+    if isinstance(data, (list, tuple)):
+        return [redact_audit_payload_for_output(item) for item in data]
+    if isinstance(data, str) and len(data) > MAX_AUDIT_STRING_LENGTH:
+        return data[:MAX_AUDIT_STRING_LENGTH] + "[TRUNCATED]"
+    return data
+
+
 def record_audit_event(
     event_type: str,
     actor_user=None,

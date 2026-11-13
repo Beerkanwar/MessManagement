@@ -272,6 +272,38 @@ def record_meal(
         student=student_obj, meal_date=meal_date, meal_type=meal_type_obj
     ).first()
     if existing_by_slot:
+        record_audit_event(
+            event_type="ATTENDANCE_DUPLICATE",
+            actor_user=recorded_by_user,
+            device_registration=device_registration,
+            entity_type="MealConsumption",
+            entity_id=existing_by_slot.meal_consumption_id,
+            reason="Duplicate meal slot rejected [Invariant 4].",
+            metadata={
+                "student_id": student_obj.student_id,
+                "roll_number": student_obj.roll_number,
+                "mess_id": mess_obj.mess_id,
+                "meal_type": meal_type_obj.code,
+                "meal_date": str(meal_date),
+                "transaction_id": str(transaction_id),
+            },
+            correlation_id=correlation_id,
+        )
+        if source == "QR":
+            record_audit_event(
+                event_type="QR_DUPLICATE",
+                actor_user=recorded_by_user,
+                device_registration=device_registration,
+                entity_type="MealConsumption",
+                entity_id=existing_by_slot.meal_consumption_id,
+                reason="Duplicate QR scan [DEC-09].",
+                metadata={
+                    "student_id": student_obj.student_id,
+                    "meal_date": str(meal_date),
+                    "meal_type": meal_type_obj.code,
+                },
+                correlation_id=correlation_id,
+            )
         return RecordMealResult(
             status="DUPLICATE",
             meal_consumption=existing_by_slot,
@@ -331,6 +363,22 @@ def record_meal(
                 correlation_id=correlation_id,
             )
 
+            if source == "QR":
+                record_audit_event(
+                    event_type="QR_SUCCESS",
+                    actor_user=recorded_by_user,
+                    device_registration=device_registration,
+                    entity_type="MealConsumption",
+                    entity_id=meal.meal_consumption_id,
+                    new_values={
+                        "student_id": student_obj.student_id,
+                        "meal_type": meal_type_obj.code,
+                        "meal_date": str(meal_date),
+                        "transaction_id": str(transaction_id),
+                    },
+                    correlation_id=correlation_id,
+                )
+
         return RecordMealResult(
             status="SYNCHRONIZED",
             meal_consumption=meal,
@@ -357,6 +405,37 @@ def record_meal(
             student=student_obj, meal_date=meal_date, meal_type=meal_type_obj
         ).first()
         if dup_slot:
+            record_audit_event(
+                event_type="ATTENDANCE_DUPLICATE",
+                actor_user=recorded_by_user,
+                device_registration=device_registration,
+                entity_type="MealConsumption",
+                entity_id=dup_slot.meal_consumption_id,
+                reason="Concurrent duplicate meal slot rejected [Invariant 4].",
+                metadata={
+                    "student_id": student_obj.student_id,
+                    "mess_id": mess_obj.mess_id,
+                    "meal_type": meal_type_obj.code,
+                    "meal_date": str(meal_date),
+                    "transaction_id": str(transaction_id),
+                },
+                correlation_id=correlation_id,
+            )
+            if source == "QR":
+                record_audit_event(
+                    event_type="QR_DUPLICATE",
+                    actor_user=recorded_by_user,
+                    device_registration=device_registration,
+                    entity_type="MealConsumption",
+                    entity_id=dup_slot.meal_consumption_id,
+                    reason="Duplicate QR scan [DEC-09].",
+                    metadata={
+                        "student_id": student_obj.student_id,
+                        "meal_date": str(meal_date),
+                        "meal_type": meal_type_obj.code,
+                    },
+                    correlation_id=correlation_id,
+                )
             return RecordMealResult(
                 status="DUPLICATE",
                 meal_consumption=dup_slot,

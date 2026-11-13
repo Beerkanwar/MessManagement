@@ -291,6 +291,20 @@ def create_student(
         status="PENDING_VERIFICATION",
         effective_from=eff_from,
     )
+    record_audit_event(
+        event_type="ASSIGNMENT_CREATED",
+        actor_user=actor,
+        entity_type="StudentMessAssignment",
+        entity_id=assignment.assignment_id,
+        new_values={
+            "student_id": student.student_id,
+            "hostel_code": hostel.code,
+            "mess_code": mess.code,
+            "status": assignment.status,
+            "effective_from": str(eff_from),
+        },
+        correlation_id=correlation_id,
+    )
 
     # Provision QR secret [SPEC SDD §19, ImplementationGuide Phase 6]
     provision_student_secret(student, actor=actor)
@@ -711,12 +725,27 @@ def commit_import_batch(
             )
 
             eff_from = row.get("effective_from") or today
-            StudentMessAssignment.objects.create(
+            imported_assignment = StudentMessAssignment.objects.create(
                 student=student,
                 mess=mess,
                 hostel=hostel,
                 status="PENDING_VERIFICATION",
                 effective_from=eff_from,
+            )
+            record_audit_event(
+                event_type="ASSIGNMENT_CREATED",
+                actor_user=actor,
+                entity_type="StudentMessAssignment",
+                entity_id=imported_assignment.assignment_id,
+                new_values={
+                    "student_id": student.student_id,
+                    "hostel_code": hostel.code,
+                    "mess_code": mess.code,
+                    "status": imported_assignment.status,
+                    "effective_from": str(eff_from),
+                    "source": "IMPORT",
+                },
+                correlation_id=correlation_id,
             )
 
             advance_change_cursor(f"mess:{mess.mess_id}:students")
@@ -855,12 +884,27 @@ def upload_and_commit_import(
         )
 
         eff_from = row.get("effective_from") or today
-        StudentMessAssignment.objects.create(
+        imported_assignment = StudentMessAssignment.objects.create(
             student=student,
             mess=mess,
             hostel=hostel,
             status="PENDING_VERIFICATION",
             effective_from=eff_from,
+        )
+        record_audit_event(
+            event_type="ASSIGNMENT_CREATED",
+            actor_user=actor,
+            entity_type="StudentMessAssignment",
+            entity_id=imported_assignment.assignment_id,
+            new_values={
+                "student_id": student.student_id,
+                "hostel_code": hostel.code,
+                "mess_code": mess.code,
+                "status": imported_assignment.status,
+                "effective_from": str(eff_from),
+                "source": "IMPORT",
+            },
+            correlation_id=correlation_id,
         )
 
         # Provision QR secret [SPEC SDD §19, ImplementationGuide Phase 6]
@@ -1185,6 +1229,21 @@ def transfer_student(
             "effective_from": str(effective_from),
             "reason": reason,
             "assignment_id": new_assignment.assignment_id,
+        },
+        correlation_id=correlation_id,
+    )
+    record_audit_event(
+        event_type="ASSIGNMENT_TRANSFERRED",
+        actor_user=actor,
+        entity_type="StudentMessAssignment",
+        entity_id=new_assignment.assignment_id,
+        reason=reason,
+        new_values={
+            "student_id": student.student_id,
+            "new_hostel_code": new_hostel.code,
+            "new_mess_code": new_mess.code,
+            "status": new_assignment.status,
+            "effective_from": str(effective_from),
         },
         correlation_id=correlation_id,
     )

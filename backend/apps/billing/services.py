@@ -818,6 +818,20 @@ def generate_bills(
             },
             correlation_id=correlation_id,
         )
+        record_audit_event(
+            event_type="BILL_GENERATED",
+            actor_user=actor,
+            entity_type="BillingPeriod",
+            entity_id=period.billing_period_id,
+            new_values={
+                "status": period.status,
+                "period_start": str(period.period_start),
+                "period_end": str(period.period_end),
+                "generated_bills": generated,
+                "zeroed_bills": zeroed,
+            },
+            correlation_id=correlation_id,
+        )
 
     return {
         "billing_period_id": period.billing_period_id,
@@ -864,6 +878,15 @@ def review_period(
 
     record_audit_event(
         event_type="BILLING_PERIOD_REVIEWED",
+        actor_user=actor,
+        entity_type="BillingPeriod",
+        entity_id=period.billing_period_id,
+        old_values={"status": "BILL_GENERATED"},
+        new_values={"status": "REVIEWED", "reviewed_at": now.isoformat()},
+        correlation_id=correlation_id,
+    )
+    record_audit_event(
+        event_type="BILL_REVIEWED",
         actor_user=actor,
         entity_type="BillingPeriod",
         entity_id=period.billing_period_id,
@@ -1074,6 +1097,20 @@ def add_balance_credit(
             "amount": str(amount),
             "reference": reference.strip(),
             "reason": reason.strip(),
+            "current_balance": str(account.current_balance),
+        },
+        correlation_id=correlation_id,
+    )
+    record_audit_event(
+        event_type="CREDIT_ADDED",
+        actor_user=actor,
+        entity_type="BalanceAccount",
+        entity_id=account.balance_account_id,
+        new_values={
+            "student_id": student_id,
+            "semester_id": semester_id,
+            "amount": str(amount),
+            "reference": reference.strip(),
             "current_balance": str(account.current_balance),
         },
         correlation_id=correlation_id,

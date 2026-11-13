@@ -1,0 +1,27 @@
+# Hostel Mess Management System scheduled jobs [ImplementationGuide Phase 13]
+#
+# Install with:  sudo cp deployment/crontab /etc/cron.d/messmanagement
+# Adjust the paths and the service account to match the deployment. Cron sends
+# non-zero exits to the monitoring/alerting channel configured in Phase 24.
+#
+# The jobs acquire PostgreSQL advisory locks themselves, so a slow run cannot
+# overlap with the next tick; the second invocation exits quietly.
+
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+CRON_TZ=Asia/Kolkata
+
+# Fill meal occurrences to the configured horizon: daily at 01:00 IST.
+0 1 * * * mess /srv/mess/backend/.venv/bin/python /srv/mess/backend/manage.py generate_meal_occurrences >> /var/log/mess/generate_meal_occurrences.log 2>&1
+
+# Activate and complete pause slots: every 15 minutes.
+*/15 * * * * mess /srv/mess/backend/.venv/bin/python /srv/mess/backend/manage.py advance_pauses >> /var/log/mess/advance_pauses.log 2>&1
+
+# Open the previous month's billing period: 1st of month at 00:30 IST.
+30 0 1 * * mess /srv/mess/backend/.venv/bin/python /srv/mess/backend/manage.py open_billing_period >> /var/log/mess/open_billing_period.log 2>&1
+
+# Recompute and compare cached balances: daily at 03:00 IST.
+0 3 * * * mess /srv/mess/backend/.venv/bin/python /srv/mess/backend/manage.py verify_balances >> /var/log/mess/verify_balances.log 2>&1
+
+# provision_missing_secrets is intentionally on demand:
+#   sudo -u mess /srv/mess/backend/.venv/bin/python /srv/mess/backend/manage.py provision_missing_secrets

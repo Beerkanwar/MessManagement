@@ -837,7 +837,7 @@ class TestPasswordResetAndOtp:
         )
         assert good_res.status_code == status.HTTP_200_OK
         assert AuditLog.objects.filter(
-            event_type="PASSWORD_RESET",
+            event_type="PASSWORD_CHANGED",
             entity_id=str(user.user_id),
             reason="PASSWORD_CHANGED",
         ).exists()

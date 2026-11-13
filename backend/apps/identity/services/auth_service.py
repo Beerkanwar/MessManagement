@@ -374,7 +374,7 @@ def change_password(user: User, current_password: str, new_password: str, reques
     user.save(update_fields=["password"])
 
     record_audit_event(
-        event_type="PASSWORD_RESET",
+        event_type="PASSWORD_CHANGED",
         actor_user=user,
         entity_type="User",
         entity_id=user.user_id,

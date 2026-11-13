@@ -6,65 +6,131 @@ Implements:
 - In-memory per-request/short-TTL setting cache with typed getters.
 - ApplicationVersionPolicy CRUD.
 """
-from datetime import datetime, time
+from dataclasses import dataclass
+from datetime import time
 from decimal import Decimal
 from typing import Any
 
 from django.db import transaction
-from django.utils import timezone
 
 from apps.audit.services import record_audit_event
 from apps.config.models import ApplicationVersionPolicy, SystemSetting
 from apps.core.clock import clock
 from apps.core.concurrency import check_optimistic_lock
-from apps.core.exceptions import ConflictError, NotFoundError, ValidationError
+from apps.core.exceptions import NotFoundError, ValidationError
 from apps.identity.models import User
 
-# (data_type, default_value, description, is_sensitive)
-CONFIG_REGISTRY: dict[str, tuple[str, str, str, bool]] = {
-    # DEC-11 Institutional Parameters
-    "auth.password.min_length": ("INTEGER", "10", "Minimum length for user passwords", False),
-    "auth.otp.length": ("INTEGER", "6", "Number of digits in password reset OTP", False),
-    "auth.otp.validity_minutes": ("INTEGER", "10", "Validity duration of password reset OTP in minutes", False),
-    "auth.otp.max_attempts": ("INTEGER", "5", "Maximum failed OTP attempts before invalidation", False),
-    "auth.otp.resend_cooldown_seconds": ("INTEGER", "60", "Cooldown period between OTP resend requests in seconds", False),
-    "auth.otp.max_per_hour_per_email": ("INTEGER", "5", "Maximum OTP requests per email per hour", False),
-    "auth.login.max_failures": ("INTEGER", "5", "Failed login attempts before temporary lockout", False),
-    "auth.login.lockout_minutes": ("INTEGER", "15", "Lockout duration after repeated failed logins in minutes", False),
-    "attendance.correction_window_hours": ("INTEGER", "48", "Window after MealDate within which corrections may be submitted", False),
-    "time.trusted_anchor_max_age_hours": ("INTEGER", "48", "Maximum age of trusted-time server anchor before expiry", False),
-    "time.trusted_anchor_expiring_hours": ("INTEGER", "6", "Window before expiry when trusted-time enters EXPIRING state", False),
-    "qr.step_seconds": ("INTEGER", "30", "Time-step interval for dynamic QR HMAC counter in seconds", False),
-    "qr.window_steps": ("INTEGER", "1", "Verification step window tolerance (±1 step)", False),
-    "offline.normal_hours": ("INTEGER", "24", "Normal allowed offline operational duration in hours", False),
-    "offline.grace_hours": ("INTEGER", "24", "Additional grace period for offline operation in hours", False),
-    "sync.batch_max_transactions": ("INTEGER", "500", "Maximum transactions accepted per sync batch [D11]", False),
-    "sync.overlap_minutes": ("INTEGER", "2", "Overlap window before the cursor issue time for late commits", False),
-    "sync.student_page_size": ("INTEGER", "500", "Students per bootstrap sync page", False),
-    "sync.attendance_window_days": ("INTEGER", "3", "Days of effective attendance returned in the sync download", False),
-    "sync.rate_limit_per_minute": ("INTEGER", "6", "Maximum sync calls per device per minute", False),
-    "billing.period_lock_window_days": ("INTEGER", "2", "Days after month end when billing period moves to LOCKED", False),
 
-    # DEC-06 Meal End Times (IST)
-    "meal.BREAKFAST.end_time": ("TIME", "10:00", "Breakfast service end time in IST", False),
-    "meal.LUNCH.end_time": ("TIME", "14:30", "Lunch service end time in IST", False),
-    "meal.EVENING_SNACKS.end_time": ("TIME", "18:30", "Evening snacks service end time in IST", False),
-    "meal.DINNER.end_time": ("TIME", "22:00", "Dinner service end time in IST", False),
+@dataclass(frozen=True)
+class SettingSpec:
+    """
+    Appendix B2 parameter metadata enforced by the configuration API.
 
-    # DEC-07 Rollover Time & Horizon
-    "meal.rollover_time": ("TIME", "03:00", "Midnight shift rollover time in IST", False),
-    "meal.occurrence_horizon_days": ("INTEGER", "35", "Occurrence generator forward horizon in days", False),
+    ``env_only`` values are deployment secrets or environment switches; they are
+    documented in the registry but can never become SystemSetting rows
+    [SPEC DBDD §12, SDD §102].
+    """
 
-    # Appendix B2 Configuration Registry
-    "sync.cursor_lookback": ("INTEGER", "50", "Cursor version lookback window", False),
-    "pause.qualifying_slots": ("INTEGER", "3", "Number of qualifying slots before pause activates", False),
-    "feedback.max_comment_length": ("INTEGER", "1000", "Maximum character length for feedback comment", False),
-    "import.max_rows": ("INTEGER", "2000", "Maximum student rows in a single import batch", False),
-    "report.max_range_days": ("INTEGER", "366", "Maximum date range for generated reports", False),
-    "backup.retention_days": ("INTEGER", "30", "Backup retention period in days", False),
+    key: str
+    data_type: str
+    default: str
+    description: str
+    is_sensitive: bool = False
+    minimum: int | Decimal | None = None
+    maximum: int | Decimal | None = None
+    phase: str = ""
+    env_only: bool = False
+    max_length: int | None = None
 
-    # Sensitive key for security / masking validation
-    "system.sensitive_token": ("STRING", "sample-secret", "Sample sensitive token", True),
+
+def _spec(
+    key: str,
+    data_type: str,
+    default: str,
+    description: str,
+    *,
+    is_sensitive: bool = False,
+    minimum=None,
+    maximum=None,
+    phase: str = "",
+    env_only: bool = False,
+    max_length=None,
+) -> SettingSpec:
+    return SettingSpec(
+        key=key,
+        data_type=data_type,
+        default=default,
+        description=description,
+        is_sensitive=is_sensitive,
+        minimum=minimum,
+        maximum=maximum,
+        phase=phase,
+        env_only=env_only,
+        max_length=max_length,
+    )
+
+
+CONFIG_REGISTRY: dict[str, SettingSpec] = {
+    spec.key: spec
+    for spec in (
+        # Authentication and session policy [DEC-11, Appendix B2]
+        _spec("auth.password.min_length", "INTEGER", "10", "Minimum password length", minimum=8, maximum=128, phase="P3"),
+        _spec("auth.otp.length", "INTEGER", "6", "Digits in a password reset OTP", minimum=4, maximum=8, phase="P3"),
+        _spec("auth.otp.validity_minutes", "INTEGER", "10", "OTP validity in minutes", minimum=1, maximum=60, phase="P3"),
+        _spec("auth.otp.max_attempts", "INTEGER", "5", "Failed OTP attempts before invalidation", minimum=1, maximum=10, phase="P3"),
+        _spec("auth.otp.resend_cooldown_seconds", "INTEGER", "60", "OTP resend cooldown in seconds", minimum=0, maximum=3600, phase="P3"),
+        _spec("auth.otp.max_per_hour_per_email", "INTEGER", "5", "OTP requests per email per hour", minimum=1, maximum=20, phase="P3"),
+        _spec("auth.login.max_failures", "INTEGER", "5", "Failed logins before lockout", minimum=1, maximum=20, phase="P3"),
+        _spec("auth.login.lockout_minutes", "INTEGER", "15", "Login lockout duration in minutes", minimum=1, maximum=1440, phase="P3"),
+        _spec("auth.refresh_replay_grace_seconds", "INTEGER", "30", "Refresh-token replay grace window", minimum=0, maximum=300, phase="P3"),
+
+        # Attendance, trusted time and QR [DEC-01, DEC-07]
+        _spec("attendance.correction_window_hours", "INTEGER", "48", "Correction window after MealDate", minimum=1, maximum=168, phase="P7"),
+        _spec("time.trusted_anchor_max_age_hours", "INTEGER", "48", "Maximum trusted-time anchor age", minimum=1, maximum=168, phase="P6"),
+        _spec("time.trusted_anchor_expiring_hours", "INTEGER", "6", "Anchor expiry warning window", minimum=1, maximum=48, phase="P6"),
+        _spec("qr.step_seconds", "INTEGER", "30", "QR HMAC time step in seconds", minimum=10, maximum=120, phase="P6"),
+        _spec("qr.window_steps", "INTEGER", "1", "QR verification tolerance in steps", minimum=0, maximum=3, phase="P6"),
+
+        # Offline and sync [DEC-10, DEC-11, D11/I02]
+        _spec("offline.normal_hours", "INTEGER", "24", "Normal offline operation window", minimum=1, maximum=168, phase="P8"),
+        _spec("offline.grace_hours", "INTEGER", "24", "Additional offline grace window", minimum=0, maximum=168, phase="P8"),
+        _spec("sync.batch_max_transactions", "INTEGER", "500", "Maximum transactions per sync batch [D11]", minimum=1, maximum=500, phase="P8"),
+        _spec("sync.overlap_minutes", "INTEGER", "2", "Cursor overlap for late commits", minimum=0, maximum=60, phase="P8"),
+        _spec("sync.student_page_size", "INTEGER", "500", "Students per bootstrap page", minimum=1, maximum=1000, phase="P8"),
+        _spec("sync.attendance_window_days", "INTEGER", "3", "Attendance days returned by sync", minimum=1, maximum=30, phase="P8"),
+        _spec("sync.rate_limit_per_minute", "INTEGER", "6", "Sync calls per device per minute", minimum=1, maximum=120, phase="P8"),
+        _spec("sync.cursor_lookback", "INTEGER", "50", "Cursor version lookback window", minimum=0, maximum=500, phase="P8"),
+
+        # Billing, meals and pause [DEC-06, DEC-07]
+        _spec("billing.period_lock_window_days", "INTEGER", "2", "Days after month end before locking", minimum=0, maximum=31, phase="P10"),
+        _spec("meal.BREAKFAST.end_time", "TIME", "10:00", "Breakfast service end time (IST)", phase="P5"),
+        _spec("meal.LUNCH.end_time", "TIME", "14:30", "Lunch service end time (IST)", phase="P5"),
+        _spec("meal.EVENING_SNACKS.end_time", "TIME", "18:30", "Evening snacks end time (IST)", phase="P5"),
+        _spec("meal.DINNER.end_time", "TIME", "22:00", "Dinner service end time (IST)", phase="P5"),
+        _spec("meal.rollover_time", "TIME", "03:00", "Midnight shift rollover time (IST)", phase="P5"),
+        _spec("meal.occurrence_horizon_days", "INTEGER", "35", "Occurrence generation horizon in days", minimum=1, maximum=365, phase="P5"),
+        _spec("pause.qualifying_slots", "INTEGER", "3", "Qualifying meal slots before a pause activates", minimum=1, maximum=10, phase="P9"),
+
+        # Feedback, import, reports and retention
+        _spec("feedback.max_comment_length", "INTEGER", "1000", "Maximum feedback comment length", minimum=1, maximum=5000, phase="P11"),
+        _spec("import.max_rows", "INTEGER", "2000", "Maximum student rows per import batch", minimum=1, maximum=10000, phase="P4"),
+        _spec("import.max_size_mb", "INTEGER", "2", "Maximum student import file size in MB", minimum=1, maximum=10, phase="P4"),
+        _spec("report.max_range_days", "INTEGER", "366", "Maximum report date range in days", minimum=1, maximum=366, phase="P12"),
+        _spec("backup.retention_days", "INTEGER", "30", "Backup retention period in days", minimum=1, maximum=3650, phase="P24"),
+
+        # Sensitive sentinel retained for masking tests; real secrets are env-only.
+        _spec("system.sensitive_token", "STRING", "sample-secret", "Sample sensitive token", is_sensitive=True, phase="P13"),
+
+        # Environment-only values: documented, never stored in SystemSetting.
+        _spec("time.zone", "STRING", "Asia/Kolkata", "Institutional time zone [DEC-01]", phase="P1", env_only=True),
+        _spec("auth.access_token_ttl_minutes", "INTEGER", "15", "Access token lifetime [SDD]", phase="P3", env_only=True),
+        _spec("auth.refresh_ttl_mobile_days", "INTEGER", "30", "Mobile refresh token lifetime [DEC-10]", phase="P3", env_only=True),
+        _spec("auth.refresh_ttl_web_hours", "INTEGER", "12", "Web refresh token lifetime [DEC-10]", phase="P3", env_only=True),
+        _spec("secrets.jwt_signing_key", "STRING", "", "JWT signing key [SDD §102]", is_sensitive=True, phase="P3", env_only=True),
+        _spec("secrets.database_password", "STRING", "", "Database password [SDD §102]", is_sensitive=True, phase="P1", env_only=True),
+        _spec("secrets.secret_encryption_key", "STRING", "", "Student secret encryption key [SDD §63]", is_sensitive=True, phase="P6", env_only=True),
+        _spec("secrets.smtp_password", "STRING", "", "SMTP password [SDD §102]", is_sensitive=True, phase="P3", env_only=True),
+    )
 }
 
 # Per-process cache for settings
@@ -76,11 +142,23 @@ def clear_settings_cache():
     _SETTINGS_CACHE.clear()
 
 
-def validate_setting_value(data_type: str, value: str) -> None:
-    """Validate setting value according to its declared data_type."""
+def validate_setting_value(
+    data_type: str,
+    value: str,
+    *,
+    spec: SettingSpec | None = None,
+) -> None:
+    """
+    Validate a setting value against its declared data_type and registry bounds.
+
+    Bounds are part of Appendix B2: an out-of-range value is rejected here so no
+    API path can persist a parameter the consumers cannot honour.
+    """
+    parsed: int | Decimal | None = None
+
     if data_type == "INTEGER":
         try:
-            int(value)
+            parsed = int(value)
         except (ValueError, TypeError):
             raise ValidationError(
                 code="VALIDATION_ERROR",
@@ -94,7 +172,7 @@ def validate_setting_value(data_type: str, value: str) -> None:
             )
     elif data_type == "DECIMAL":
         try:
-            Decimal(value)
+            parsed = Decimal(value)
         except Exception:
             raise ValidationError(
                 code="VALIDATION_ERROR",
@@ -112,6 +190,32 @@ def validate_setting_value(data_type: str, value: str) -> None:
             raise ValidationError(
                 code="VALIDATION_ERROR",
                 message=f"Value '{value}' contains invalid hours or minutes.",
+            )
+    elif data_type == "STRING":
+        pass
+    else:
+        raise ValidationError(
+            code="VALIDATION_ERROR",
+            message=f"Unsupported configuration data type '{data_type}'.",
+        )
+
+    if spec is None:
+        return
+    if spec.max_length is not None and len(str(value)) > spec.max_length:
+        raise ValidationError(
+            code="VALIDATION_ERROR",
+            message=f"Value for '{spec.key}' exceeds {spec.max_length} characters.",
+        )
+    if parsed is not None:
+        if spec.minimum is not None and parsed < spec.minimum:
+            raise ValidationError(
+                code="VALIDATION_ERROR",
+                message=f"Value for '{spec.key}' must be >= {spec.minimum}.",
+            )
+        if spec.maximum is not None and parsed > spec.maximum:
+            raise ValidationError(
+                code="VALIDATION_ERROR",
+                message=f"Value for '{spec.key}' must be <= {spec.maximum}.",
             )
 
 
@@ -138,7 +242,7 @@ def get_setting(key: str, default: Any = None) -> Any:
         return val
 
     if key in CONFIG_REGISTRY:
-        return CONFIG_REGISTRY[key][1]
+        return CONFIG_REGISTRY[key].default
 
     return default
 
@@ -192,14 +296,22 @@ def update_setting(
     Never edits existing rows. Unknown keys are rejected against CONFIG_REGISTRY.
     Masks sensitive values in audit logs.
     """
-    if key not in CONFIG_REGISTRY:
+    spec = CONFIG_REGISTRY.get(key)
+    if spec is None:
         raise ValidationError(
             code="UNKNOWN_SETTING_KEY",
             message=f"Configuration key '{key}' is unknown. Must be defined in system registry.",
         )
+    if spec.env_only:
+        raise ValidationError(
+            code="ENV_ONLY_SETTING",
+            message=(
+                f"Configuration key '{key}' is deployment-managed and cannot be "
+                "stored as a SystemSetting. Set it through the environment."
+            ),
+        )
 
-    data_type, default_val, description, is_sensitive = CONFIG_REGISTRY[key]
-    validate_setting_value(data_type, value)
+    validate_setting_value(spec.data_type, value, spec=spec)
 
     now = clock.now()
     latest = (
@@ -214,9 +326,9 @@ def update_setting(
     setting = SystemSetting.objects.create(
         key=key,
         value=str(value),
-        data_type=data_type,
-        description=description,
-        is_sensitive=is_sensitive,
+        data_type=spec.data_type,
+        description=spec.description,
+        is_sensitive=spec.is_sensitive,
         effective_from=now,
         version=new_version,
     )
@@ -225,7 +337,7 @@ def update_setting(
     _SETTINGS_CACHE.pop(key, None)
 
     # Prepare audit values
-    if is_sensitive:
+    if spec.is_sensitive:
         old_val_audit = {"value": "******"} if latest else None
         new_val_audit = {"value": "******"}
     else:
@@ -246,54 +358,80 @@ def update_setting(
     return setting
 
 
+def _setting_output(
+    *,
+    key: str,
+    setting: SystemSetting | None,
+    spec: SettingSpec,
+    mask_sensitive: bool,
+) -> dict[str, Any]:
+    """Build one registry row with Appendix B2 metadata for the admin API."""
+    is_sensitive = spec.is_sensitive
+    if setting is not None:
+        value = "******" if (is_sensitive and mask_sensitive) else setting.value
+        row = {
+            "setting_id": setting.setting_id,
+            "key": key,
+            "value": value,
+            "data_type": setting.data_type,
+            "description": setting.description,
+            "is_sensitive": is_sensitive,
+            "effective_from": setting.effective_from,
+            "version": setting.version,
+        }
+    else:
+        value = "******" if (is_sensitive and mask_sensitive) else spec.default
+        row = {
+            "setting_id": None,
+            "key": key,
+            "value": value,
+            "data_type": spec.data_type,
+            "description": spec.description,
+            "is_sensitive": is_sensitive,
+            "effective_from": None,
+            "version": 1,
+        }
+    row.update(
+        {
+            "minimum": None if spec.minimum is None else str(spec.minimum),
+            "maximum": None if spec.maximum is None else str(spec.maximum),
+            "max_length": spec.max_length,
+            "phase": spec.phase,
+            "env_only": spec.env_only,
+            "editable": not spec.env_only,
+        }
+    )
+    return row
+
+
 def list_system_settings(mask_sensitive: bool = True) -> list[dict[str, Any]]:
     """
-    Lists the current effective configuration settings.
-    If mask_sensitive is True, sensitive values are masked as '******'.
+    Lists the current effective configuration settings with registry metadata.
+
+    Rows come from the registry, so documented parameters that have never been
+    changed still appear with their default. Sensitive values are masked.
     """
     now = clock.now()
-    results = []
+    current: dict[str, SystemSetting] = {}
 
-    # Get distinct keys from DB and registry
     db_settings = (
         SystemSetting.objects
         .filter(effective_from__lte=now)
         .order_by("key", "-effective_from")
     )
-    seen_keys: set[str] = set()
+    for setting in db_settings:
+        current.setdefault(setting.key, setting)
 
-    for s in db_settings:
-        if s.key in seen_keys:
-            continue
-        seen_keys.add(s.key)
-        val = "******" if (s.is_sensitive and mask_sensitive) else s.value
-        results.append({
-            "setting_id": s.setting_id,
-            "key": s.key,
-            "value": val,
-            "data_type": s.data_type,
-            "description": s.description,
-            "is_sensitive": s.is_sensitive,
-            "effective_from": s.effective_from,
-            "version": s.version,
-        })
-
-    # Add registry items not yet in DB
-    for key, (dtype, dval, desc, is_sens) in CONFIG_REGISTRY.items():
-        if key not in seen_keys:
-            val = "******" if (is_sens and mask_sensitive) else dval
-            results.append({
-                "setting_id": None,
-                "key": key,
-                "value": val,
-                "data_type": dtype,
-                "description": desc,
-                "is_sensitive": is_sens,
-                "effective_from": None,
-                "version": 1,
-            })
-
-    results.sort(key=lambda x: x["key"])
+    results = [
+        _setting_output(
+            key=key,
+            setting=current.get(key),
+            spec=spec,
+            mask_sensitive=mask_sensitive,
+        )
+        for key, spec in CONFIG_REGISTRY.items()
+    ]
+    results.sort(key=lambda row: row["key"])
     return results
 
 

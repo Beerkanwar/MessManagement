@@ -8,8 +8,10 @@ API Versioning & Deprecation Policy (ISSUE-22):
 - Deprecated endpoints must announce deprecation via RFC 8594 `Sunset` and `Deprecation` response headers,
   maintaining backward compatibility for a minimum 6-month deprecation lifecycle prior to decommission.
 """
+from django.conf import settings
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from apps.core.admin_site import admin_site
 from apps.core.views.health import health_live_view, health_ready_view
 
 # API v1 versioned endpoints
@@ -38,6 +40,9 @@ urlpatterns = [
     # Health checks outside versioned prefix [SPEC SDD §105]
     path("health/live", health_live_view, name="health_live"),
     path("health/ready", health_ready_view, name="health_ready"),
+
+    # Bounded Django admin at an environment-configured path [Phase 13]
+    path(f"{settings.ADMIN_PATH}/", admin_site.urls),
 
     # Central API v1 routing shell [SPEC SDD §64]
     path("api/v1/", include(v1_patterns)),

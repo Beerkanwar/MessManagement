@@ -205,6 +205,17 @@ CORS_ALLOWED_ORIGINS = env.list(
 )
 CORS_ALLOW_CREDENTIALS = True
 
+# Bounded Django admin [ImplementationGuide Phase 13]
+# The path is deliberately not /admin/ and is expected to be restricted to the
+# college network by the reverse proxy. Sessions last one hour.
+ADMIN_PATH = env("DJANGO_ADMIN_PATH", default="ops-admin").strip("/") or "ops-admin"
+ADMIN_SESSION_SECONDS = env.int("DJANGO_ADMIN_SESSION_SECONDS", default=3600)
+SESSION_COOKIE_AGE = ADMIN_SESSION_SECONDS
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False
+
 # Security invariant (ISSUE-07): Prevent wildcard origins when credentials are permitted
 if CORS_ALLOW_CREDENTIALS and "*" in CORS_ALLOWED_ORIGINS:
     from django.core.exceptions import ImproperlyConfigured
