@@ -56,5 +56,6 @@ export const Icons = {
   ArrowRight: (props: LucideProps) => <ArrowRight {...defaultIconProps} {...props} />,
   X: (props: LucideProps) => <X {...defaultIconProps} {...props} />,
   Filter: (props: LucideProps) => <SlidersHorizontal {...defaultIconProps} {...props} />,
+  SlidersHorizontal: (props: LucideProps) => <SlidersHorizontal {...defaultIconProps} {...props} />,
 };
 
