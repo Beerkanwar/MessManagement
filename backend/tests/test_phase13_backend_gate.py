@@ -52,6 +52,10 @@ from apps.identity.models import Role, UserRole
 from apps.identity.services.auth_service import login_user
 from apps.menu.models import FoodItem
 from apps.mess.models import MealOccurrence, MealType, Mess
+from apps.pause.models import MessPause
+from apps.pause.services import advance_pauses
+from apps.reports.scope import ReportContext
+from apps.reports.services import record_export_audit
 
 User = get_user_model()
 
@@ -663,7 +667,117 @@ def test_credit_emits_audit_event(super_admin, campus):
     ).exists()
 
 
-@pytest.mark.django_db
+APPENDIX_B_EVENTS = [
+    "LOGIN_SUCCESS",
+    "LOGIN_FAILURE",
+    "PASSWORD_RESET",
+    "PASSWORD_CHANGED",
+    "TOKEN_REUSE_DETECTED",
+    "DEVICE_REGISTERED",
+    "DEVICE_REVOKE_PENDING_SYNC",
+    "DEVICE_REVOKED",
+    "SECRET_ROTATED",
+    "STUDENT_CREATED",
+    "STUDENT_IMPORT_COMMITTED",
+    "STUDENT_VERIFIED",
+    "ASSIGNMENT_CREATED",
+    "ASSIGNMENT_TRANSFERRED",
+    "ATTENDANCE_DUPLICATE",
+    "ATTENDANCE_CORRECTED",
+    "SYNC_SUCCESS",
+    "SYNC_FAILURE",
+    "SYNC_CONFLICT",
+    "SYNC_CONFLICT_RESOLVED",
+    "PAUSE_SUBMITTED",
+    "PAUSE_ACTIVATED",
+    "PAUSE_COMPLETED",
+    "PAUSE_CANCELLED",
+    "BILL_GENERATED",
+    "BILL_ADJUSTED",
+    "BILL_LOCKED",
+    "BILL_UNLOCKED",
+    "BILL_REVIEWED",
+    "CREDIT_ADDED",
+    "RATE_CHANGED",
+    "SETTING_CHANGED",
+    "MASTER_DATA_CHANGED",
+    "MENU_PUBLISHED",
+    "MENU_REVISED",
+    "REPORT_EXPORTED",
+]
+
+# Transitions must record a before and an after snapshot [Appendix B].
+TRANSITION_EVENTS = {
+    "ATTENDANCE_CORRECTED",
+    "BILL_ADJUSTED",
+    "BILL_LOCKED",
+    "BILL_UNLOCKED",
+    "BILL_REVIEWED",
+    "PAUSE_ACTIVATED",
+    "PAUSE_COMPLETED",
+    "PAUSE_CANCELLED",
+    "SECRET_ROTATED",
+}
+
+# Actions an operator may be asked to justify in a review must carry a reason.
+REASON_REQUIRED_EVENTS = {
+    "ASSIGNMENT_TRANSFERRED",
+    "ATTENDANCE_CORRECTED",
+    "BILL_ADJUSTED",
+    "BILL_UNLOCKED",
+    "DEVICE_REVOKED",
+    "MASTER_DATA_CHANGED",
+    "PAUSE_CANCELLED",
+    "RATE_CHANGED",
+    "SETTING_CHANGED",
+}
+
+# These events are tied to a registered device and must link to it.
+DEVICE_REQUIRED_EVENTS = {
+    "ATTENDANCE_DUPLICATE",
+    "DEVICE_REGISTERED",
+    "DEVICE_REVOKE_PENDING_SYNC",
+    "DEVICE_REVOKED",
+    "LOGIN_SUCCESS",
+    "SYNC_CONFLICT",
+    "SYNC_FAILURE",
+    "SYNC_SUCCESS",
+    "TOKEN_REUSE_DETECTED",
+}
+
+
+def _audit_calls():
+    """Yield (event_type, kwargs, path, lineno) for every audit emission."""
+    import ast
+    from pathlib import Path
+
+    apps_dir = Path(__file__).resolve().parent.parent / "apps"
+    for path in apps_dir.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = (
+                func.id
+                if isinstance(func, ast.Name)
+                else func.attr
+                if isinstance(func, ast.Attribute)
+                else ""
+            )
+            if name != "record_audit_event":
+                continue
+            keywords = {kw.arg: kw.value for kw in node.keywords}
+            event_node = keywords.get("event_type")
+            event_type = (
+                event_node.value
+                if isinstance(event_node, ast.Constant)
+                and isinstance(event_node.value, str)
+                else ""
+            )
+            yield event_type, set(keywords), str(path), node.lineno
+
+
 def test_appendix_b_events_have_emission_points():
     """Every Appendix B event code is emitted somewhere in application code."""
     from pathlib import Path
@@ -673,46 +787,95 @@ def test_appendix_b_events_have_emission_points():
         path.read_text(encoding="utf-8", errors="ignore")
         for path in apps_dir.rglob("*.py")
     )
-    events = [
-        "LOGIN_SUCCESS",
-        "LOGIN_FAILURE",
-        "PASSWORD_RESET",
-        "PASSWORD_CHANGED",
-        "TOKEN_REUSE_DETECTED",
-        "DEVICE_REGISTERED",
-        "DEVICE_REVOKE_PENDING_SYNC",
-        "DEVICE_REVOKED",
-        "SECRET_ROTATED",
-        "STUDENT_CREATED",
-        "STUDENT_IMPORT_COMMITTED",
-        "STUDENT_VERIFIED",
-        "ASSIGNMENT_CREATED",
-        "ASSIGNMENT_TRANSFERRED",
-        "ATTENDANCE_DUPLICATE",
-        "ATTENDANCE_CORRECTED",
-        "SYNC_SUCCESS",
-        "SYNC_FAILURE",
-        "SYNC_CONFLICT",
-        "SYNC_CONFLICT_RESOLVED",
-        "PAUSE_SUBMITTED",
-        "PAUSE_ACTIVATED",
-        "PAUSE_COMPLETED",
-        "PAUSE_CANCELLED",
-        "BILL_GENERATED",
-        "BILL_ADJUSTED",
-        "BILL_LOCKED",
-        "BILL_UNLOCKED",
-        "BILL_REVIEWED",
-        "CREDIT_ADDED",
-        "RATE_CHANGED",
-        "SETTING_CHANGED",
-        "MASTER_DATA_CHANGED",
-        "MENU_PUBLISHED",
-        "MENU_REVISED",
-        "REPORT_EXPORTED",
-    ]
-    missing = [event for event in events if event not in source]
+    missing = [event for event in APPENDIX_B_EVENTS if event not in source]
     assert missing == []
+
+
+def test_appendix_b_payload_contract():
+    """
+    Every emission of an Appendix B event carries the shared envelope, and the
+    event families carry the extra context the specification requires.
+    """
+    calls = [call for call in _audit_calls() if call[0] in APPENDIX_B_EVENTS]
+    assert calls, "No Appendix B audit emissions found."
+
+    problems = []
+    for event_type, kwargs, path, lineno in calls:
+        location = f"{event_type} at {path}:{lineno}"
+        required = {"event_type", "entity_type", "entity_id", "correlation_id"}
+        if event_type != "LOGIN_FAILURE":
+            # A failed login for an unknown email has no actor row to reference.
+            required.add("actor_user")
+        missing = required - kwargs
+        if missing:
+            problems.append(f"{location}: missing {sorted(missing)}")
+        if event_type in TRANSITION_EVENTS:
+            transition_missing = {"old_values", "new_values"} - kwargs
+            if transition_missing:
+                problems.append(
+                    f"{location}: transition missing {sorted(transition_missing)}"
+                )
+        if event_type in REASON_REQUIRED_EVENTS and "reason" not in kwargs:
+            problems.append(f"{location}: missing reason")
+        if event_type in DEVICE_REQUIRED_EVENTS and "device_registration" not in kwargs:
+            problems.append(f"{location}: missing device_registration")
+        if not ({"old_values", "new_values", "metadata", "reason"} & kwargs):
+            problems.append(f"{location}: no before/after/context payload")
+
+    assert problems == []
+
+
+@pytest.mark.django_db
+def test_pause_completed_audit_carries_correlation_and_snapshots(
+    super_admin, campus
+):
+    pause = MessPause.objects.create(
+        student=campus["student"],
+        mess=campus["mess"],
+        requested_start_date=date(2026, 11, 1),
+        requested_end_date=date(2026, 11, 5),
+        effective_start_date=date(2026, 11, 1),
+        effective_end_date=date(2026, 11, 5),
+        status="ACTIVE",
+        requested_at=clock.now(),
+    )
+
+    advance_pauses(now=clock.now())
+
+    log = AuditLog.objects.get(event_type="PAUSE_COMPLETED")
+    assert log.entity_type == "MessPause"
+    assert log.entity_id == str(pause.pause_id)
+    assert log.correlation_id.startswith("job:advance_pauses:")
+    assert log.old_values_json == {"status": "ACTIVE"}
+    assert log.new_values_json == {
+        "status": "COMPLETED",
+        "effective_end_date": "2026-11-05",
+    }
+
+
+@pytest.mark.django_db
+def test_report_exported_audit_carries_actor_correlation_and_context(super_admin):
+    definition = type("Definition", (), {"id": "attendance-daily"})()
+    ctx = ReportContext(
+        user=super_admin,
+        role="SUPER_ADMIN",
+        date_from=date(2026, 11, 1),
+        date_to=date(2026, 11, 2),
+        applied_filters={"hostel": 7},
+        correlation_id="req-export-123",
+    )
+
+    record_export_audit(definition, ctx, "csv", row_count=42)
+
+    log = AuditLog.objects.get(event_type="REPORT_EXPORTED")
+    assert log.actor_user == super_admin
+    assert log.entity_type == "REPORT"
+    assert log.entity_id == "attendance-daily"
+    assert log.correlation_id == "req-export-123"
+    assert log.metadata_json["row_count"] == 42
+    assert log.metadata_json["format"] == "csv"
+    assert log.metadata_json["hostel"] == 7
+
 
 
 # ---------------------------------------------------------------------------

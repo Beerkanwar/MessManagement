@@ -469,6 +469,7 @@ def import_commit_view(request, batch_id: int = None):
     summary="Cancel Import Batch",
     description="Cancels a STAGED or VALIDATED import batch.",
     tags=["students"],
+    request=None,
     responses={200: OpenApiResponse(description="Batch cancelled")},
 )
 @api_view(["POST"])
@@ -779,6 +780,7 @@ def clerk_reassign_view(request, user_id: int):
     summary="Deactivate Hostel Clerk",
     description="Deactivates a Clerk's assignment.",
     tags=["admin"],
+    request=None,
     responses={200: OpenApiResponse(description="Clerk deactivated")},
 )
 @api_view(["POST"])

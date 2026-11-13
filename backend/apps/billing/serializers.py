@@ -264,7 +264,13 @@ class BalanceSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _entries(account: BalanceAccount):
-        return account.ledger_entries.all().order_by("ledger_entry_id")
+        entries = getattr(account, "_serialized_ledger_entries", None)
+        if entries is None:
+            entries = list(account.ledger_entries.all())
+            if "ledger_entries" not in getattr(account, "_prefetched_objects_cache", {}):
+                entries.sort(key=lambda entry: entry.ledger_entry_id)
+            account._serialized_ledger_entries = entries
+        return entries
 
     def get_credits_total(self, account: BalanceAccount) -> str:
         total = sum(

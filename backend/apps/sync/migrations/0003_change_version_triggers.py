@@ -23,8 +23,9 @@ TABLES = [
 
 
 def _backfill_sql() -> str:
+    # Table names come from the fixed TABLES literal above.
     return "\n".join(
-        f"UPDATE {table} SET change_version = nextval('change_version_seq');"
+        f"UPDATE {table} SET change_version = nextval('change_version_seq');"  # nosec
         for table in TABLES
     )
 

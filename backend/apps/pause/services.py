@@ -19,7 +19,7 @@ from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from typing import Any, Iterable, Sequence
 
 from django.db import IntegrityError, transaction
-from django.db.models import F, Q
+from django.db.models import F, Prefetch, Q
 
 from apps.audit.services import record_audit_event
 from apps.config.services import get_time_setting
@@ -159,7 +159,8 @@ def build_activation_plan(
             ),
         )
 
-    assert activation_meal_date is not None
+    if activation_meal_date is None:  # pragma: no cover - guarded by the count above
+        raise RuntimeError("Activation plan is missing its activation meal date.")
     return ActivationPlan(
         counted_slots=tuple(counted),
         skipped_slots=tuple(skipped),
@@ -649,7 +650,7 @@ def _activate_if_ready(pause: MessPause, correlation_id: str = "") -> bool:
     return True
 
 
-def _complete_if_due(pause: MessPause, now: datetime) -> bool:
+def _complete_if_due(pause: MessPause, now: datetime, correlation_id: str = "") -> bool:
     """Transition ACTIVE to COMPLETED after the effective end date has passed."""
     if pause.status != "ACTIVE":
         return False
@@ -672,13 +673,18 @@ def _complete_if_due(pause: MessPause, now: datetime) -> bool:
             "status": "COMPLETED",
             "effective_end_date": str(end_date),
         },
+        correlation_id=correlation_id,
     )
 
     _touch_student_sync(pause)
     return True
 
 
-def advance_pause(pause: MessPause, now: datetime | None = None) -> bool:
+def advance_pause(
+    pause: MessPause,
+    now: datetime | None = None,
+    correlation_id: str = "",
+) -> bool:
     """
     Advance one pause through its lifecycle in the caller's transaction.
     Idempotent: running it again with no elapsed slot changes nothing.
@@ -694,10 +700,10 @@ def advance_pause(pause: MessPause, now: datetime | None = None) -> bool:
         if changed and pause.status == "SCHEDULED":
             _save_pause(pause, ["activation_meal_date", "effective_start_date"])
 
-        if _activate_if_ready(pause):
+        if _activate_if_ready(pause, correlation_id=correlation_id):
             changed = True
 
-    if pause.status == "ACTIVE" and _complete_if_due(pause, now):
+    if pause.status == "ACTIVE" and _complete_if_due(pause, now, correlation_id):
         changed = True
 
     return changed
@@ -722,6 +728,10 @@ def advance_pauses(now: datetime | None = None) -> dict[str, int]:
         )
     )
 
+    # One trace id per job run lets an operator find every transition produced by
+    # a single cron tick [ImplementationGuide Phase 13, Appendix B].
+    correlation_id = f"job:advance_pauses:{now.isoformat()}"
+
     for pause_id in pause_ids:
         with transaction.atomic():
             pause = (
@@ -736,7 +746,7 @@ def advance_pauses(now: datetime | None = None) -> dict[str, int]:
             previous_status = pause.status
             counts["processed"] += 1
 
-            if advance_pause(pause, now):
+            if advance_pause(pause, now, correlation_id=correlation_id):
                 counts["changed"] += 1
 
             # A long time jump can activate and complete in the same run, so count
@@ -987,10 +997,23 @@ def get_pause_state(student: Student) -> dict[str, Any]:
 
 
 def get_pauses_for_student(student: Student, limit: int = 50):
-    """Return all pauses for a student, ordered by most recent first [SPEC DBDD §7]."""
+    """Return all pauses for a student, ordered by most recent first [SPEC DBDD §7].
+
+    Meal slots are prefetched with their meal occurrence and meal type so the
+    pause list serializes in a constant number of queries, independent of how
+    many pauses the student has [ImplementationGuide Phase 13].
+    """
     return (
         MessPause.objects.filter(student=student)
         .select_related("mess")
+        .prefetch_related(
+            Prefetch(
+                "meal_slots",
+                queryset=MessPauseMealSlot.objects.select_related(
+                    "meal_occurrence__meal_type"
+                ).order_by("slot_sequence"),
+            )
+        )
         .order_by("-requested_at")[:limit]
     )
 

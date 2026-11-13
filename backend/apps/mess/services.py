@@ -369,6 +369,8 @@ def deactivate_mess_manager(
         entity_type="MessManagerAssignment",
         entity_id=user.user_id,
         reason="Deactivated manager assignment",
+        old_values={"is_active": True, "mess_ids": mess_ids},
+        new_values={"is_active": False, "deactivated": count > 0},
         correlation_id=correlation_id,
     )
 

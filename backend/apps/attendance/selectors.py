@@ -82,7 +82,9 @@ def get_effective_meal_consumptions(
     if end_date is not None:
         qs = qs.filter(meal_date__lte=end_date)
 
-    return qs.select_related("student", "mess", "meal_type").order_by("-meal_date", "-meal_consumption_id")
+    return qs.select_related(
+        "student", "student__user", "mess", "meal_type"
+    ).order_by("-meal_date", "-meal_consumption_id")
 
 
 def get_scoped_meal_consumptions(
@@ -188,7 +190,9 @@ def get_scoped_extra_transactions(
     Returns ExtraTransaction queryset scoped to caller role.
     """
     role = get_user_role(user)
-    qs = ExtraTransaction.objects.all().select_related("student", "hostel", "mess", "extra_item")
+    qs = ExtraTransaction.objects.all().select_related(
+        "student", "student__user", "hostel", "mess", "extra_item"
+    )
 
     if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
         pass

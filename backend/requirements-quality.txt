@@ -1,0 +1,7 @@
+# Quality-gate tools only. Never install this file in production.
+#
+#   pip install -r requirements.txt -r requirements-quality.txt
+#
+# The CI workflow in .github/workflows/backend-quality.yml runs both tools.
+pip-audit>=2.7,<3
+bandit>=1.7,<2

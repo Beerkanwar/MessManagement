@@ -57,6 +57,37 @@ The audit table is protected in three layers:
   rules. It grants no authority beyond the role system; it is not a substitute
   for server-side authorization.
 
+## Migration review checklist
+
+Every migration to `main` is reviewed like application code. A reviewer signs
+off only when all of the following hold:
+
+1. **Generated, not hand-edited** — `python manage.py makemigrations --check
+   --dry-run` is clean, and the file was produced by Django or is a documented
+   hand-written `RunSQL` with both `sql` and `reverse_sql`.
+2. **Reversible** — `tests/test_migrations.py::test_all_migrations_are_reversible`
+   passes locally and in CI. A migration that cannot be reversed needs an
+   explicit, reviewed exception describing the recovery procedure.
+3. **No silent data loss** — dropping or retyping a column/table has a written
+   backfill plan, and the old value is preserved or exported first.
+4. **Lock impact understood** — tables above 100k rows use `CONCURRENTLY` index
+   creation or a staged add/backfill/swap; no long `ALTER TABLE` runs in the
+   request path.
+5. **Constraints named** — every check, unique and exclusion constraint has an
+   explicit `name` matching the `db_table`/`..._check` convention so rollback
+   errors are diagnosable.
+6. **Seeds are idempotent** — seed migrations use `get_or_create`/`update_or_create`
+   and are safe to re-run on an existing database.
+7. **Contract impact checked** — schema changes to `/api/v1` are additive only
+   after `phase-13-contract`; CI runs `scripts/check_schema_contract.py` against
+   the newest `phase-*` tag.
+8. **Tested on a production-like snapshot** — forward and backward migration
+   rehearsed against a recent backup, including timing, before the release.
+9. **Runner role** — migrations run as the non-superuser database owner so the
+   audit privilege revocation binds the application role.
+10. **Rollback path documented** — the release notes name the target revision,
+    the backup to restore if needed, and whether the rollback is online.
+
 ## Deployment secrets (environment only)
 
 Real secrets are never `SystemSetting` rows [SPEC DBDD §12, SDD §102]. Keep

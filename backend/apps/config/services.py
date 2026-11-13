@@ -562,6 +562,7 @@ def delete_version_policy(*, policy_id: int, actor: User | None = None, correlat
         entity_id=policy.policy_id,
         reason=f"Deleted version policy {policy.platform} {policy.app_version}",
         old_values={"platform": policy.platform, "app_version": policy.app_version, "status": policy.status},
+        new_values={"deleted": True},
         correlation_id=correlation_id,
     )
     policy.delete()

@@ -89,14 +89,22 @@ def _int_param(request, name: str) -> int | None:
         )
 
 
-def _period_payload(period, *, include_preflight: bool = False) -> dict:
+def _period_payload(period, *, include_preflight: bool = False, summary=None) -> dict:
     data = dict(BillingPeriodSerializer(period).data)
-    data["bill_count"] = period.bills.count() if hasattr(period, "bills") else 0
-    data["stale_transaction_count"] = billing_selectors.count_stale_transactions(period)
-    data["totals"] = {
-        key: str(value) if isinstance(value, Decimal) else value
-        for key, value in billing_selectors.bill_totals(period).items()
-    }
+    if summary is not None:
+        data["bill_count"] = summary["bill_count"]
+        data["stale_transaction_count"] = summary["stale_transaction_count"]
+        data["totals"] = {
+            key: str(value) if isinstance(value, Decimal) else value
+            for key, value in summary["totals"].items()
+        }
+    else:
+        data["bill_count"] = period.bills.count() if hasattr(period, "bills") else 0
+        data["stale_transaction_count"] = billing_selectors.count_stale_transactions(period)
+        data["totals"] = {
+            key: str(value) if isinstance(value, Decimal) else value
+            for key, value in billing_selectors.bill_totals(period).items()
+        }
     if include_preflight:
         preflight = billing_selectors.generation_preflight(period)
         semester = preflight["semester"]
@@ -217,8 +225,11 @@ def period_collection_view(request):
     periods = billing_selectors.list_billing_periods()
     paginator = StandardPageNumberPagination()
     page = paginator.paginate_queryset(periods, request)
+    rows = list(page if page is not None else periods)
+    summaries = billing_selectors.period_summaries(rows)
     data = [
-        _period_payload(period) for period in (page if page is not None else periods)
+        _period_payload(period, summary=summaries[period.billing_period_id])
+        for period in rows
     ]
     if page is not None:
         return paginator.get_paginated_response(data)

@@ -14,12 +14,25 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import Q, QuerySet, Sum
+from django.db.models import (
+    Case,
+    Count,
+    IntegerField,
+    Prefetch,
+    Q,
+    QuerySet,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce
 
 from apps.attendance.models import AttendanceCorrection, ExtraTransaction, MealConsumption
 from apps.billing.models import (
     BalanceAccount,
+    BalanceLedgerEntry,
     Bill,
+    BillAdjustment,
     BillingPeriod,
     BillingPolicy,
     Semester,
@@ -68,6 +81,118 @@ def list_billing_periods() -> QuerySet[BillingPeriod]:
     )
 
 
+def period_summaries(periods: list[BillingPeriod]) -> dict[int, dict[str, Any]]:
+    """Batch the per-period tiles so a list page costs a constant query count.
+
+    Equivalent to calling :func:`bill_totals` and
+    :func:`count_stale_transactions` for each period, but groups the work into
+    one bill aggregate plus one bucketed query per transaction source.
+    """
+    period_list = list(periods)
+    if not period_list:
+        return {}
+
+    period_ids = [period.billing_period_id for period in period_list]
+
+    bills_by_period = {
+        row["billing_period_id"]: row
+        for row in Bill.objects.filter(billing_period_id__in=period_ids)
+        .values("billing_period_id")
+        .annotate(
+            bill_count=Count("bill_id"),
+            student_count=Count("student_id", distinct=True),
+            total_billed=Sum("final_amount"),
+            total_extras=Sum("extra_charges_amount"),
+            total_adjustments=Sum("adjustment_amount"),
+        )
+    }
+
+    stale: dict[int, int] = {period_id: 0 for period_id in period_ids}
+
+    def add_bucket_counts(queryset, conditions):
+        whens = [
+            When(condition, then=Value(period_id))
+            for period_id, condition in conditions
+        ]
+        if not whens:
+            return
+        combined = Q(pk__in=[])
+        for _period_id, condition in conditions:
+            combined |= condition
+        labeled = queryset.filter(combined).annotate(
+            _period_id=Case(*whens, output_field=IntegerField())
+        )
+        for row in (
+            labeled.values("_period_id").annotate(count=Count("*")).iterator()
+        ):
+            stale[row["_period_id"]] += row["count"]
+
+    extra_conditions = []
+    meal_conditions = []
+    correction_conditions = []
+    for period in period_list:
+        if not period.generated_at:
+            continue
+        generated_at = period.generated_at
+        start, end = _ist_period_bounds(period)
+        extra_conditions.append(
+            (
+                period.billing_period_id,
+                Q(transaction_timestamp__gte=start, transaction_timestamp__lt=end)
+                & (
+                    Q(accepted_at__gt=generated_at)
+                    | Q(accepted_at__isnull=True, created_at__gt=generated_at)
+                ),
+            )
+        )
+        meal_conditions.append(
+            (
+                period.billing_period_id,
+                Q(
+                    meal_date__gte=period.period_start,
+                    meal_date__lte=period.period_end,
+                    accepted_at__gt=generated_at,
+                ),
+            )
+        )
+        correction_conditions.append(
+            (
+                period.billing_period_id,
+                Q(
+                    status="APPLIED",
+                    meal_date__gte=period.period_start,
+                    meal_date__lte=period.period_end,
+                    applied_at__gt=generated_at,
+                ),
+            )
+        )
+
+    add_bucket_counts(
+        ExtraTransaction.objects.exclude(sync_status__in=REJECTED_EXTRA_STATUSES),
+        extra_conditions,
+    )
+    add_bucket_counts(MealConsumption.objects.all(), meal_conditions)
+    add_bucket_counts(AttendanceCorrection.objects.all(), correction_conditions)
+
+    summaries: dict[int, dict[str, Any]] = {}
+    for period in period_list:
+        period_id = period.billing_period_id
+        totals = bills_by_period.get(period_id, {})
+        summaries[period_id] = {
+            "bill_count": totals.get("bill_count", 0),
+            "stale_transaction_count": stale[period_id],
+            "totals": {
+                "student_count": totals.get("student_count", 0),
+                "total_billed": totals.get("total_billed") or Decimal("0.0000"),
+                "total_extras": totals.get("total_extras") or Decimal("0.0000"),
+                "total_adjustments": totals.get("total_adjustments")
+                or Decimal("0.0000"),
+                "bill_count": totals.get("bill_count", 0),
+            },
+        }
+    return summaries
+
+
 def get_billing_period(billing_period_id: int) -> BillingPeriod | None:
     return BillingPeriod.objects.filter(billing_period_id=billing_period_id).first()
 
@@ -95,7 +220,13 @@ def get_bills_scoped(
         "mess",
         "billing_period",
         "semester",
-    ).prefetch_related("lines", "adjustments")
+    ).prefetch_related(
+        "lines",
+        Prefetch(
+            "adjustments",
+            queryset=BillAdjustment.objects.select_related("created_by"),
+        ),
+    )
 
     if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
         pass
@@ -138,7 +269,13 @@ def get_bill_scoped(user: User, bill_id: int) -> Bill | None:
 def get_period_bills(period: BillingPeriod) -> QuerySet[Bill]:
     return Bill.objects.filter(billing_period=period).select_related(
         "student", "student__user", "mess", "billing_period", "semester"
-    ).prefetch_related("lines", "adjustments")
+    ).prefetch_related(
+        "lines",
+        Prefetch(
+            "adjustments",
+            queryset=BillAdjustment.objects.select_related("created_by"),
+        ),
+    )
 
 
 def get_balances_scoped(
@@ -151,7 +288,14 @@ def get_balances_scoped(
     role = get_user_role(user)
     qs = BalanceAccount.objects.select_related(
         "student", "student__user", "semester"
-    ).prefetch_related("ledger_entries")
+    ).prefetch_related(
+        Prefetch(
+            "ledger_entries",
+            queryset=BalanceLedgerEntry.objects.select_related("created_by").order_by(
+                "ledger_entry_id"
+            ),
+        )
+    )
 
     if role == "SUPER_ADMIN" or getattr(user, "is_superuser", False):
         pass

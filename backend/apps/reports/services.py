@@ -192,7 +192,10 @@ def parse_format(params: Mapping[str, Any]) -> str:
 
 
 def build_context(
-    user: User, role: str, params: Mapping[str, Any]
+    user: User,
+    role: str,
+    params: Mapping[str, Any],
+    correlation_id: str = "",
 ) -> ReportContext:
     date_from = _parse_date(params, "from")
     date_to = _parse_date(params, "to")
@@ -227,6 +230,7 @@ def build_context(
         meal_type=meal_type,
         extra_item_id=extra_item_id,
         applied_filters=applied,
+        correlation_id=correlation_id,
     )
 
 
@@ -387,6 +391,7 @@ def record_export_audit(
         entity_type="REPORT",
         entity_id=definition.id,
         metadata=metadata,
+        correlation_id=ctx.correlation_id,
     )
 
 

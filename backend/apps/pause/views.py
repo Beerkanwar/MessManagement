@@ -66,16 +66,20 @@ def _iso(value):
 
 def _serialize_pause(pause: MessPause) -> dict:
     """Serialize a pause, including counted and skipped activation slots."""
-    slots = PauseMealSlotSerializer(
-        pause.meal_slots.select_related("meal_occurrence__meal_type").order_by(
-            "slot_sequence"
-        ),
-        many=True,
-    ).data
-    consumed = pause.meal_slots.filter(
-        qualifies_for_activation=True,
-        consumed_for_activation=True,
-    ).count()
+    if "meal_slots" in getattr(pause, "_prefetched_objects_cache", {}):
+        slot_rows = list(pause.meal_slots.all())
+    else:
+        slot_rows = list(
+            pause.meal_slots.select_related("meal_occurrence__meal_type").order_by(
+                "slot_sequence"
+            )
+        )
+    slots = PauseMealSlotSerializer(slot_rows, many=True).data
+    consumed = sum(
+        1
+        for slot in slot_rows
+        if slot.qualifies_for_activation and slot.consumed_for_activation
+    )
     return {
         "pause_id": pause.pause_id,
         "student_id": pause.student_id,

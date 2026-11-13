@@ -147,7 +147,12 @@ def report_catalog_view(request):
 def report_detail_view(request, report_id: str):
     role, definition = services.get_authorized_report(request.user, report_id)
     fmt = services.parse_format(request.query_params)
-    ctx = services.build_context(request.user, role, request.query_params)
+    ctx = services.build_context(
+        request.user,
+        role,
+        request.query_params,
+        correlation_id=getattr(request, "correlation_id", ""),
+    )
 
     if fmt == "json":
         return services.paginate_report(definition, ctx, request=request)

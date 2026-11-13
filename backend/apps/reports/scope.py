@@ -62,6 +62,7 @@ class ReportContext:
     meal_type: str | int | None = None
     extra_item_id: int | None = None
     applied_filters: dict[str, Any] = field(default_factory=dict)
+    correlation_id: str = ""
 
     @property
     def scope_hostel_id(self) -> int | None:

@@ -1,0 +1,14 @@
+# Configuration for the static security scan [ImplementationGuide Phase 13].
+#
+# Run from backend/ with:
+#   python -m bandit -c pyproject.toml -r apps config
+#
+# Every global skip below is a documented false positive:
+# - B105 hardcoded_password_string: error-code constants such as
+#   "INVALID_TOKEN" and throttle strings such as "60/minute" are not secrets.
+# - B104 hardcoded_bind_all_interfaces: dev settings only allow "0.0.0.0" in
+#   ALLOWED_HOSTS; the server binds to the address given to gunicorn.
+[tool.bandit]
+targets = ["apps", "config"]
+exclude_dirs = [".venv", "tests"]
+skips = ["B105", "B104"]

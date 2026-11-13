@@ -254,6 +254,7 @@ def mess_manager_reassign_view(request, user_id: int):
     summary="Deactivate Mess Manager",
     description="Deactivates a Mess Manager's assignment.",
     tags=["admin"],
+    request=None,
     responses={200: OpenApiResponse(description="Mess Manager deactivated")},
 )
 @api_view(["POST"])
@@ -457,6 +458,7 @@ def extra_items_list_create_view(request):
         qs = (
             ExtraItem.objects
             .select_related("hostel")
+            .prefetch_related("prices")
             .order_by("hostel__code", "name")
         )
 

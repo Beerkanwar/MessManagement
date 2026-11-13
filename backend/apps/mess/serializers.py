@@ -236,7 +236,20 @@ class ExtraItemSerializer(serializers.ModelSerializer):
 
     def get_current_price(self, obj) -> str | None:
         today = clock.today()
-        price = get_extra_price(obj, today)
+        if "prices" in getattr(obj, "_prefetched_objects_cache", {}):
+            covering = [
+                price
+                for price in obj.prices.all()
+                if price.effective_from <= today
+                and (price.effective_to is None or price.effective_to > today)
+            ]
+            price = (
+                max(covering, key=lambda row: row.effective_from).unit_price
+                if covering
+                else None
+            )
+        else:
+            price = get_extra_price(obj, today)
         return str(price) if price is not None else None
 
 
