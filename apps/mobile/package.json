@@ -1,0 +1,23 @@
+{
+  "name": "@mess/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "test": "jest"
+  },
+  "dependencies": {
+    "expo": "~51.0.0",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  },
+  "devDependencies": {
+    "@types/react": "~18.2.45",
+    "@types/react-native": "^0.73.0",
+    "typescript": "^5.3.3"
+  }
+}
+

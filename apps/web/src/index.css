@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #0F766E;
+    --primary-hover: #115E59;
+    --primary-subtle: #F0FDFA;
+    --primary-border: #99F6E4;
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --border: #E2E8F0;
+    --border-strong: #CBD5E1;
+    --success: #15803D;
+    --warning: #B45309;
+    --danger: #B91C1C;
+    --info: #1D4ED8;
+    --neutral-state: #475569;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Accessible focus ring: 2px primary, 2px offset */
+  *:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
