@@ -72,7 +72,6 @@ class DeviceRegistrationSerializer(serializers.ModelSerializer):
             "revoke_reason",
         ]
 
-    def get_user_role(self, obj):
+    def get_user_role(self, obj) -> str:
         ur = obj.user.user_roles.filter(is_active=True).first()
         return ur.role.role_name if ur else ""
-

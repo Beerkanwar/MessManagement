@@ -138,6 +138,25 @@ paths:
           description: ''
         '204':
           description: Policy deleted
+  /api/v1/admin/devices:
+    get:
+      operationId: admin_devices_list
+      description: Super Admin lists device registrations with filters for role and
+        session status [SPEC SDD §121].
+      summary: Admin List Devices
+      tags:
+      - admin
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceRegistration'
+          description: ''
   /api/v1/admin/devices/{device_id}/revoke:
     post:
       operationId: admin_devices_revoke_create
@@ -3250,7 +3269,7 @@ components:
           readOnly: true
         platform:
           allOf:
-          - $ref: '#/components/schemas/ApplicationVersionPolicyPlatformEnum'
+          - $ref: '#/components/schemas/Platform561Enum'
           description: |-
             Target platform
 
@@ -3314,16 +3333,6 @@ components:
       - app_version
       - platform
       - status
-    ApplicationVersionPolicyPlatformEnum:
-      enum:
-      - ANDROID
-      - IOS
-      - WEB
-      type: string
-      description: |-
-        * `ANDROID` - Android
-        * `IOS` - iOS
-        * `WEB` - Web
     ApplicationVersionPolicyStatusEnum:
       enum:
       - SUPPORTED
@@ -4173,6 +4182,62 @@ components:
       - hostel
       - months
       - student_id
+    DeviceRegistration:
+      type: object
+      properties:
+        device_registration_id:
+          type: integer
+          readOnly: true
+        user_id:
+          type: integer
+          description: Surrogate primary key matching DBDD §3 UserId
+          readOnly: true
+        user_email:
+          type: string
+          readOnly: true
+        user_full_name:
+          type: string
+          readOnly: true
+        user_role:
+          type: string
+          readOnly: true
+        device_id:
+          type: string
+          description: Client-generated device identifier
+          maxLength: 255
+        platform:
+          $ref: '#/components/schemas/Platform561Enum'
+        device_name:
+          type: string
+          maxLength: 255
+        app_version:
+          type: string
+          maxLength: 50
+        session_status:
+          $ref: '#/components/schemas/SessionStatusEnum'
+        registered_at:
+          type: string
+          format: date-time
+          description: When device was first registered
+        last_active_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoke_reason:
+          type: string
+      required:
+      - device_id
+      - device_registration_id
+      - platform
+      - registered_at
+      - user_email
+      - user_full_name
+      - user_id
+      - user_role
     EntityTypeEnum:
       enum:
       - MEAL_CONSUMPTION
@@ -5817,6 +5882,16 @@ components:
         * `ANDROID` - ANDROID
         * `IOS` - IOS
         * `WEB` - WEB
+    Platform561Enum:
+      enum:
+      - ANDROID
+      - IOS
+      - WEB
+      type: string
+      description: |-
+        * `ANDROID` - Android
+        * `IOS` - iOS
+        * `WEB` - Web
     RefreshTokenRequestRequest:
       type: object
       properties:
@@ -6099,6 +6174,20 @@ components:
         * `ACTIVE` - Active
         * `COMPLETED` - Completed
         * `ARCHIVED` - Archived
+    SessionStatusEnum:
+      enum:
+      - ACTIVE
+      - REPLACED
+      - REVOKE_PENDING_SYNC
+      - REVOKED
+      - LOGGED_OUT
+      type: string
+      description: |-
+        * `ACTIVE` - Active
+        * `REPLACED` - Replaced
+        * `REVOKE_PENDING_SYNC` - Revoke Pending Sync
+        * `REVOKED` - Revoked
+        * `LOGGED_OUT` - Logged Out
     Status372Enum:
       enum:
       - ACTIVE

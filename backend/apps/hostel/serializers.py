@@ -110,7 +110,7 @@ class StudentDetailSerializer(serializers.ModelSerializer):
             "current_assignment",
         ]
 
-    def get_current_assignment(self, obj):
+    def get_current_assignment(self, obj) -> dict[str, object] | None:
         from apps.core.clock import clock
         from django.db.models import Q
 
@@ -169,7 +169,7 @@ class StudentMeSerializer(serializers.ModelSerializer):
             "current_assignment",
         ]
 
-    def get_current_assignment(self, obj):
+    def get_current_assignment(self, obj) -> dict[str, object] | None:
         from apps.core.clock import clock
         from django.db.models import Q
 
@@ -231,7 +231,7 @@ class PendingVerificationSerializer(serializers.ModelSerializer):
             "effective_from", "status", "created_at",
         ]
 
-    def get_student(self, obj):
+    def get_student(self, obj) -> dict[str, object]:
         return {
             "student_id": obj.student.student_id,
             "roll_number": obj.student.roll_number,

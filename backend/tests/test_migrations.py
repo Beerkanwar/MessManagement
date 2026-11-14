@@ -4,10 +4,17 @@ Checkpoint:
 - makemigrations --check reports no pending changes.
 """
 from io import StringIO
+import importlib
 import pytest
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
+
+seed_meal_types_migration = importlib.import_module(
+    "apps.mess.migrations.0003_seed_meal_types"
+)
+MEAL_TYPES = seed_meal_types_migration.MEAL_TYPES
+reverse_meal_types = seed_meal_types_migration.reverse_meal_types
 
 
 @pytest.mark.django_db
@@ -49,7 +56,6 @@ def test_all_migrations_are_reversible():
 
         executor.loader.build_graph()
         executor.migrate(leaves)
-
         executor.loader.build_graph()
         applied = set(executor.loader.applied_migrations)
         missing = [leaf for leaf in leaves if leaf not in applied]
@@ -59,3 +65,35 @@ def test_all_migrations_are_reversible():
         # reversibility assertion fails and the suite must keep running.
         executor.loader.build_graph()
         executor.migrate(leaves)
+
+
+def test_reverse_meal_types_uses_direct_sql_delete():
+    class _ModelMeta:
+        db_table = "mess_meal_type"
+
+    class _MealTypeModel:
+        _meta = _ModelMeta()
+
+    class _Apps:
+        @staticmethod
+        def get_model(app_label, model_name):
+            assert app_label == "mess"
+            assert model_name == "MealType"
+            return _MealTypeModel
+
+    class _SchemaEditor:
+        sql = None
+        params = None
+
+        def execute(self, sql, params=()):
+            self.sql = sql
+            self.params = list(params)
+
+    schema_editor = _SchemaEditor()
+    reverse_meal_types(_Apps(), schema_editor)
+
+    expected_codes = [code for code, *_ in MEAL_TYPES]
+    assert schema_editor.params == expected_codes
+    assert schema_editor.sql == (
+        'DELETE FROM "mess_meal_type" WHERE "code" IN (%s, %s, %s, %s)'
+    )

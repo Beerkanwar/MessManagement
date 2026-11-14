@@ -89,7 +89,7 @@ class MessManagerAssignmentSerializer(serializers.ModelSerializer):
             "version",
         ]
 
-    def get_mess(self, obj):
+    def get_mess(self, obj) -> dict[str, object]:
         return {
             "id": obj.mess.mess_id,
             "code": obj.mess.code,
@@ -276,4 +276,3 @@ class ExtraItemUpdateSerializer(serializers.Serializer):
 
 class ExtraItemDeactivateSerializer(serializers.Serializer):
     version = serializers.IntegerField(help_text="Optimistic concurrency version counter")
-
