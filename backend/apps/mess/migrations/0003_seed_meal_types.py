@@ -28,13 +28,8 @@ def seed_meal_types(apps, schema_editor):
 
 
 def reverse_meal_types(apps, schema_editor):
-    table_name = apps.get_model("mess", "MealType")._meta.db_table
-    codes = [m[0] for m in MEAL_TYPES]
-    placeholders = ", ".join(["%s"] * len(codes))
-    schema_editor.execute(
-        f'DELETE FROM "{table_name}" WHERE "code" IN ({placeholders})',
-        params=codes,
-    )
+    MealType = apps.get_model("mess", "MealType")
+    MealType.objects.filter(code__in=[m[0] for m in MEAL_TYPES]).delete()
 
 
 class Migration(migrations.Migration):
