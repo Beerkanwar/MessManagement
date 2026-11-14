@@ -30,9 +30,13 @@ def seed_meal_types(apps, schema_editor):
 def reverse_meal_types(apps, schema_editor):
     MealType = apps.get_model("mess", "MealType")
     codes = [m[0] for m in MEAL_TYPES]
-    table = MealType._meta.db_table
-    placeholders = ", ".join(["%s"] * len(codes))
-    schema_editor.execute(f"DELETE FROM {table} WHERE code IN ({placeholders})", codes)
+    # Use _raw_delete to issue a single direct SQL DELETE without invoking
+    # Django's Python-level CASCADE collector (which would query dependent tables
+    # such as attendance_attendance_correction that have already been unapplied)
+    # and without string-interpolated SQL that triggers static security scanners.
+    MealType.objects.filter(code__in=codes)._raw_delete(
+        using=schema_editor.connection.alias
+    )
 
 
 class Migration(migrations.Migration):
