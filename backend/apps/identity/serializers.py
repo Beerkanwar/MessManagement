@@ -2,6 +2,7 @@
 Serializers for identity, authentication, and device management endpoints.
 """
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 
 
 class LoginRequestSerializer(serializers.Serializer):
@@ -72,7 +73,8 @@ class DeviceRegistrationSerializer(serializers.ModelSerializer):
             "revoke_reason",
         ]
 
-    def get_user_role(self, obj):
+    @extend_schema_field(serializers.CharField(allow_blank=True))
+    def get_user_role(self, obj) -> str:
         ur = obj.user.user_roles.filter(is_active=True).first()
         return ur.role.role_name if ur else ""
 
