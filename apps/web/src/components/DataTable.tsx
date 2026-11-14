@@ -27,6 +27,7 @@ export interface DataTableProps<T> {
   emptyDescription?: string;
   stickyHeader?: boolean;
   dense?: boolean;
+  onRowClick?: (row: T) => void;
   className?: string;
 }
 
@@ -44,6 +45,7 @@ export function DataTable<T>({
   emptyDescription = 'There are no items to display right now.',
   stickyHeader = true,
   dense = false,
+  onRowClick,
   className,
 }: DataTableProps<T>) {
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
@@ -173,14 +175,16 @@ export function DataTable<T>({
                 return (
                   <tr
                     key={key}
+                    onClick={() => onRowClick?.(row)}
                     className={cn(
                       'transition-colors hover:bg-bg/80',
+                      onRowClick && 'cursor-pointer',
                       isSelected && 'bg-primary-subtle',
                       dense ? 'text-[13px] leading-[18px]' : 'text-[14px] leading-[20px]'
                     )}
                   >
                     {selectable && (
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           aria-label={`Select row ${key}`}
                           checked={isSelected}

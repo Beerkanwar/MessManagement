@@ -16,6 +16,7 @@ export const CLERK_NAV: NavGroup[] = [
       { label: 'Student Verification', path: '/clerk/verifications', iconName: 'checkCircle' },
       { label: 'Menu', path: '/clerk/menu', iconName: 'calendar' },
       { label: 'Extra Items', path: '/clerk/extras', iconName: 'plus' },
+      { label: 'Attendance', path: '/clerk/attendance', iconName: 'clock' },
       { label: 'Bills', path: '/clerk/bills', iconName: 'rupee' },
       { label: 'Feedback', path: '/clerk/feedback', iconName: 'chat' },
       { label: 'Reports', path: '/clerk/reports', iconName: 'chart' },

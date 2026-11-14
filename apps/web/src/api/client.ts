@@ -106,7 +106,8 @@ class ApiClient {
     options: RequestInit = {},
     isRetry = false
   ): Promise<T> {
-    const url = path.startsWith('http') ? path : `${env.apiBasePath}${path.startsWith('/') ? path : `/${path}`}`;
+    const normalizedPath = path.startsWith('/api/v1') ? path.replace(/^\/api\/v1/, '') : path;
+    const url = path.startsWith('http') ? path : `${env.apiBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}`;
     const method = (options.method || 'GET').toUpperCase();
 
     const headers = new Headers(options.headers || {});
@@ -200,6 +201,14 @@ class ApiClient {
     return this.request<T>(path, {
       ...options,
       method: 'PUT',
+      body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  public patch<T>(path: string, body?: any, options?: RequestInit): Promise<T> {
+    return this.request<T>(path, {
+      ...options,
+      method: 'PATCH',
       body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,
     });
   }

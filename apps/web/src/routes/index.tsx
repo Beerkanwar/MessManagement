@@ -10,6 +10,13 @@ import { ClerkDashboard } from '../features/dashboard/ClerkDashboard';
 import { SuperAdminDashboard } from '../features/dashboard/SuperAdminDashboard';
 import { ComponentGallery } from '../gallery/ComponentGallery';
 import { FeaturePlaceholder } from '../features/common/FeaturePlaceholder';
+import { StudentVerificationPage } from '../features/clerk/StudentVerificationPage';
+import { MenuPage } from '../features/clerk/MenuPage';
+import { ExtraItemsPage } from '../features/clerk/ExtraItemsPage';
+import { AttendancePage } from '../features/clerk/AttendancePage';
+import { BillsPage } from '../features/clerk/BillsPage';
+import { FeedbackPage } from '../features/clerk/FeedbackPage';
+import { ReportsPage } from '../features/clerk/ReportsPage';
 import { useAuth } from '../state/auth';
 
 const RootRedirect: React.FC = () => {
@@ -82,11 +89,7 @@ export const AppRoutes: React.FC = () => {
           path="clerk/verifications"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Student Verifications"
-                description="Review and approve student registrations and mess attachments"
-                phaseTarget="Phase 16"
-              />
+              <StudentVerificationPage />
             </RequireRole>
           }
         />
@@ -94,11 +97,7 @@ export const AppRoutes: React.FC = () => {
           path="clerk/menu"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Monthly Meal Menus"
-                description="Draft and publish weekly breakfast, lunch, and dinner plans"
-                phaseTarget="Phase 16"
-              />
+              <MenuPage />
             </RequireRole>
           }
         />
@@ -106,11 +105,15 @@ export const AppRoutes: React.FC = () => {
           path="clerk/extras"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Extra Items & Prices"
-                description="Maintain hostel-specific extras and effective-dated rates"
-                phaseTarget="Phase 16"
-              />
+              <ExtraItemsPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="clerk/attendance"
+          element={
+            <RequireRole allowedRoles={['HOSTEL_CLERK']}>
+              <AttendancePage />
             </RequireRole>
           }
         />
@@ -118,11 +121,7 @@ export const AppRoutes: React.FC = () => {
           path="clerk/bills"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Student Bills & Ledger"
-                description="Inspect finalized monthly diet and extras charges"
-                phaseTarget="Phase 16"
-              />
+              <BillsPage />
             </RequireRole>
           }
         />
@@ -130,11 +129,7 @@ export const AppRoutes: React.FC = () => {
           path="clerk/feedback"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Student Feedback"
-                description="Review monthly satisfaction ratings and comments"
-                phaseTarget="Phase 16"
-              />
+              <FeedbackPage />
             </RequireRole>
           }
         />
@@ -142,11 +137,7 @@ export const AppRoutes: React.FC = () => {
           path="clerk/reports"
           element={
             <RequireRole allowedRoles={['HOSTEL_CLERK']}>
-              <FeaturePlaceholder
-                title="Hostel Reports"
-                description="Attendance, billing, and consumption CSV/PDF summaries"
-                phaseTarget="Phase 16"
-              />
+              <ReportsPage />
             </RequireRole>
           }
         />
