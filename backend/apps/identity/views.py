@@ -235,6 +235,23 @@ def reset_password_view(request):
 def auth_me_view(request):
     role = get_user_role(request.user)
     device = getattr(request, "device", None)
+
+    # Version policy evaluation for mobile clients (DEC-18, Phase 18)
+    platform = request.headers.get("X-Platform", "").strip().upper()
+    app_version = request.headers.get("X-App-Version", "").strip()
+    version_policy_data = {
+        "status": "SUPPORTED",
+        "force_update_message": "",
+    }
+    if platform and app_version:
+        from apps.config.models import ApplicationVersionPolicy
+        policy = ApplicationVersionPolicy.objects.filter(
+            platform=platform, app_version=app_version
+        ).first()
+        if policy:
+            version_policy_data["status"] = policy.status
+            version_policy_data["force_update_message"] = policy.force_update_message or ""
+
     return Response(
         {
             "user": {
@@ -245,6 +262,7 @@ def auth_me_view(request):
             "role": role,
             "assignment": get_user_assignment_summary(request.user),
             "device": get_current_device_summary(device) if device else None,
+            "version_policy": version_policy_data,
         },
         status=status.HTTP_200_OK,
     )
