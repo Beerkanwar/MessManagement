@@ -25,6 +25,8 @@ export interface DataTableProps<T> {
   onSort?: (columnKey: string) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  emptyMessage?: string;
+  loading?: boolean;
   stickyHeader?: boolean;
   dense?: boolean;
   onRowClick?: (row: T) => void;
@@ -43,11 +45,14 @@ export function DataTable<T>({
   onSort,
   emptyTitle = 'No records found',
   emptyDescription = 'There are no items to display right now.',
+  emptyMessage,
+  loading = false,
   stickyHeader = true,
   dense = false,
   onRowClick,
   className,
 }: DataTableProps<T>) {
+  const displayEmptyTitle = emptyMessage || emptyTitle;
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(
     new Set(columns.map((c) => c.key))
   );
@@ -162,10 +167,16 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {data.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={activeColumns.length + (selectable ? 1 : 0)} className="p-8 text-center text-[13px] text-text-muted">
+                  Loading records...
+                </td>
+              </tr>
+            ) : data.length === 0 ? (
               <tr>
                 <td colSpan={activeColumns.length + (selectable ? 1 : 0)} className="p-8">
-                  <EmptyState title={emptyTitle} description={emptyDescription} />
+                  <EmptyState title={displayEmptyTitle} description={emptyDescription} />
                 </td>
               </tr>
             ) : (

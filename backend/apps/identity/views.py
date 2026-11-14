@@ -6,12 +6,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from apps.core.pagination import StandardPageNumberPagination
 from apps.core.permissions import IsSuperAdmin
 from apps.identity.authentication import DeviceBindingJWTAuthentication
+from apps.identity.models import DeviceRegistration
 from apps.identity.selectors import get_user_assignment_summary, get_user_role
 from apps.identity.serializers import (
     AdminRevokeDeviceSerializer,
     ChangePasswordRequestSerializer,
+    DeviceRegistrationSerializer,
     ForgotPasswordRequestSerializer,
     LoginRequestSerializer,
     RefreshTokenRequestSerializer,
@@ -347,3 +350,40 @@ def admin_device_revoke_view(request, device_id: int):
         request=request,
     )
     return Response(result, status=status.HTTP_200_OK)
+
+
+@extend_schema(
+    summary="Admin List Devices",
+    description="Super Admin lists device registrations with filters for role and session status [SPEC SDD §121].",
+    tags=["admin"],
+    responses={200: DeviceRegistrationSerializer(many=True)},
+)
+@api_view(["GET"])
+@authentication_classes([DeviceBindingJWTAuthentication])
+@permission_classes([IsAuthenticated, IsSuperAdmin])
+def admin_device_list_view(request):
+    qs = DeviceRegistration.objects.select_related("user").prefetch_related("user__user_roles__role").order_by("-registered_at")
+
+    role = request.query_params.get("role")
+    if role:
+        qs = qs.filter(user__user_roles__role__role_name__iexact=role, user__user_roles__is_active=True)
+
+    session_status = request.query_params.get("status")
+    if session_status:
+        qs = qs.filter(session_status__iexact=session_status)
+
+    search = request.query_params.get("search")
+    if search:
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(user__full_name__icontains=search)
+            | Q(user__email__icontains=search)
+            | Q(device_name__icontains=search)
+            | Q(device_id__icontains=search)
+        )
+
+    paginator = StandardPageNumberPagination()
+    page = paginator.paginate_queryset(qs, request)
+    serializer = DeviceRegistrationSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+

@@ -8,7 +8,7 @@ export interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  description: string;
+  description: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'danger' | 'primary';
@@ -78,9 +78,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <h3 id="confirm-dialog-title" className="text-[17px] font-semibold text-text">
               {title}
             </h3>
-            <p id="confirm-dialog-desc" className="text-[14px] leading-[20px] text-text-secondary mt-1">
+            <div id="confirm-dialog-desc" className="text-[14px] leading-[20px] text-text-secondary mt-1">
               {description}
-            </p>
+            </div>
           </div>
         </div>
 

@@ -9,10 +9,10 @@ import { Icons } from '../../components/Icons';
 export const SuperAdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
-    studentsAwaitingVerification: 14,
+    studentsAwaitingVerification: 0,
     billingPeriodStatus: 'OPEN',
     openSyncConflicts: 0,
-    oldestSyncDeviceHours: 2.5,
+    oldestSyncDeviceHours: 1.2,
     unresolvedImportErrors: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -21,16 +21,26 @@ export const SuperAdminDashboard: React.FC = () => {
     let isMounted = true;
     (async () => {
       try {
-        const res = await apiClient.get<any>('/reports/summary').catch(() => null);
-        if (isMounted && res) {
+        const [repRes, periodRes, confRes] = await Promise.all([
+          apiClient.get<any>('/reports/summary').catch(() => null),
+          apiClient.get<any>('/billing/periods').catch(() => null),
+          apiClient.get<any>('/sync/conflicts?status=OPEN').catch(() => null),
+        ]);
+
+        if (isMounted) {
+          const openConflicts = Array.isArray(confRes) ? confRes.length : confRes?.results?.length ?? 0;
+          const currentPeriod = Array.isArray(periodRes) ? periodRes[0] : periodRes?.results?.[0];
+
           setStats((prev) => ({
             ...prev,
-            studentsAwaitingVerification: res.pending_verifications ?? prev.studentsAwaitingVerification,
-            openSyncConflicts: res.open_conflicts ?? prev.openSyncConflicts,
+            studentsAwaitingVerification: repRes?.pending_verifications ?? prev.studentsAwaitingVerification,
+            billingPeriodStatus: currentPeriod?.status ?? prev.billingPeriodStatus,
+            openSyncConflicts: openConflicts,
+            unresolvedImportErrors: repRes?.unresolved_imports ?? 0,
           }));
         }
       } catch {
-        // Fallback stats
+        // Fallback
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -50,24 +60,26 @@ export const SuperAdminDashboard: React.FC = () => {
           </p>
         </div>
         <span className="text-[12px] font-medium text-text-muted">
-          Administrator: <strong>{user?.full_name}</strong>
+          Administrator: <strong>{user?.full_name || user?.email}</strong>
         </span>
       </div>
 
-      {/* Stat Tiles: Every tile links to the list it counts */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 5 Required Stat Tiles: Every tile links to the list it counts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Tile 1: Students Awaiting Verification */}
         <StatTile
           label="Students Awaiting Verification"
           value={loading ? '-' : stats.studentsAwaitingVerification}
-          change="Campus total across hostels"
+          change="Cross-hostel pending queue"
           changeType="neutral"
           icon={<Icons.CheckCircle className="w-5 h-5 text-warning" />}
           href="/admin/students"
         />
 
+        {/* Tile 2: Billing Period and its status */}
         <div className="bg-surface border border-border rounded-[10px] p-5 flex flex-col justify-between">
           <span className="text-[13px] font-medium text-text-secondary">Current Billing Period</span>
-          <div className="mt-3">
+          <div className="mt-2">
             <StatusBadge domain="billingPeriod" status={stats.billingPeriodStatus} />
             <a href="/admin/billing" className="block text-[12px] text-primary hover:underline mt-2">
               Manage billing cycles →
@@ -75,6 +87,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Tile 3: Open Sync Conflicts */}
         <StatTile
           label="Open Sync Conflicts"
           value={loading ? '-' : stats.openSyncConflicts}
@@ -84,19 +97,30 @@ export const SuperAdminDashboard: React.FC = () => {
           href="/admin/sync"
         />
 
+        {/* Tile 4: Devices with Oldest Last Sync */}
         <StatTile
           label="Oldest Device Last Sync"
           value={loading ? '-' : `${stats.oldestSyncDeviceHours}h ago`}
-          change="Within 48h grace period"
+          change="Within 48h offline window"
           changeType="positive"
           icon={<Icons.Clock className="w-5 h-5 text-text-muted" />}
           href="/admin/devices"
+        />
+
+        {/* Tile 5: Unresolved Import Errors */}
+        <StatTile
+          label="Unresolved Import Errors"
+          value={loading ? '-' : stats.unresolvedImportErrors}
+          change={stats.unresolvedImportErrors === 0 ? 'No error rows pending' : 'Rows require resolution'}
+          changeType={stats.unresolvedImportErrors === 0 ? 'positive' : 'negative'}
+          icon={<Icons.AlertTriangle className="w-5 h-5 text-danger" />}
+          href="/admin/students"
         />
       </div>
 
       {/* Module Overview Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="People & Places" subtitle="Master data administration">
+        <Card title="People & Facilities" subtitle="Master data administration">
           <div className="space-y-2 text-[13px]">
             <a href="/admin/hostels" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
               <span>Hostels Master</span>
@@ -107,7 +131,7 @@ export const SuperAdminDashboard: React.FC = () => {
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/students" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
-              <span>Student Registry</span>
+              <span>Student Registry & Import</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/clerks" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
@@ -121,14 +145,14 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </Card>
 
-        <Card title="Finance & Pricing" subtitle="Rates, extras, and billing">
+        <Card title="Finance & Pricing" subtitle="Rates, extras, and billing cycles">
           <div className="space-y-2 text-[13px]">
             <a href="/admin/meal-config" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
               <span>Meal Occurrences & Schedule</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/pricing" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
-              <span>Common Meal Rates</span>
+              <span>Common Meal Rates & Extras</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/billing" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
@@ -138,22 +162,26 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </Card>
 
-        <Card title="Operations & Security" subtitle="Audits and settings">
+        <Card title="Operations & Security" subtitle="Audits, versions, and sync">
           <div className="space-y-2 text-[13px]">
             <a href="/admin/devices" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
               <span>Device Registrations</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/sync" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
-              <span>Batch Sync Queues</span>
+              <span>Sync Queues & Conflicts</span>
+              <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
+            </a>
+            <a href="/admin/reports" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
+              <span>Central Reports Catalog</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/audit" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
-              <span>System Audit Logs</span>
+              <span>Immutable Audit Logs</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
             <a href="/admin/settings" className="flex items-center justify-between p-2 rounded hover:bg-bg transition-colors">
-              <span>System Configuration</span>
+              <span>System Configuration & Secrets</span>
               <Icons.ChevronRight className="w-4 h-4 text-text-muted" />
             </a>
           </div>
@@ -162,5 +190,3 @@ export const SuperAdminDashboard: React.FC = () => {
     </div>
   );
 };
-export default SuperAdminDashboard;
-

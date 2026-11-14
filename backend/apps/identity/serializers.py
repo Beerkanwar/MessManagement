@@ -45,3 +45,34 @@ class UpdateDeviceMetadataSerializer(serializers.Serializer):
 
 class AdminRevokeDeviceSerializer(serializers.Serializer):
     reason = serializers.CharField(min_length=5, help_text="Mandatory business reason for device revocation")
+
+
+class DeviceRegistrationSerializer(serializers.ModelSerializer):
+    user_email = serializers.CharField(source="user.email", read_only=True)
+    user_full_name = serializers.CharField(source="user.full_name", read_only=True)
+    user_role = serializers.SerializerMethodField()
+
+    class Meta:
+        from apps.identity.models import DeviceRegistration
+        model = DeviceRegistration
+        fields = [
+            "device_registration_id",
+            "user_id",
+            "user_email",
+            "user_full_name",
+            "user_role",
+            "device_id",
+            "platform",
+            "device_name",
+            "app_version",
+            "session_status",
+            "registered_at",
+            "last_active_at",
+            "revoked_at",
+            "revoke_reason",
+        ]
+
+    def get_user_role(self, obj):
+        ur = obj.user.user_roles.filter(is_active=True).first()
+        return ur.role.role_name if ur else ""
+

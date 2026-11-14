@@ -9,7 +9,6 @@ import { NotFoundPage } from './NotFoundPage';
 import { ClerkDashboard } from '../features/dashboard/ClerkDashboard';
 import { SuperAdminDashboard } from '../features/dashboard/SuperAdminDashboard';
 import { ComponentGallery } from '../gallery/ComponentGallery';
-import { FeaturePlaceholder } from '../features/common/FeaturePlaceholder';
 import { StudentVerificationPage } from '../features/clerk/StudentVerificationPage';
 import { MenuPage } from '../features/clerk/MenuPage';
 import { ExtraItemsPage } from '../features/clerk/ExtraItemsPage';
@@ -17,6 +16,19 @@ import { AttendancePage } from '../features/clerk/AttendancePage';
 import { BillsPage } from '../features/clerk/BillsPage';
 import { FeedbackPage } from '../features/clerk/FeedbackPage';
 import { ReportsPage } from '../features/clerk/ReportsPage';
+import { HostelsPage } from '../features/admin/HostelsPage';
+import { MessesPage } from '../features/admin/MessesPage';
+import { ClerksPage } from '../features/admin/ClerksPage';
+import { ManagersPage } from '../features/admin/ManagersPage';
+import { StudentsPage } from '../features/admin/StudentsPage';
+import { MealConfigPage } from '../features/admin/MealConfigPage';
+import { PricingPage } from '../features/admin/PricingPage';
+import { BillingPage } from '../features/admin/BillingPage';
+import { DevicesPage } from '../features/admin/DevicesPage';
+import { SyncPage } from '../features/admin/SyncPage';
+import { ReportsPage as AdminReportsPage } from '../features/admin/ReportsPage';
+import { AuditLogsPage } from '../features/admin/AuditLogsPage';
+import { SystemConfigPage } from '../features/admin/SystemConfigPage';
 import { useAuth } from '../state/auth';
 
 const RootRedirect: React.FC = () => {
@@ -163,11 +175,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/hostels"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Hostels Master"
-                description="Manage hostel properties, clerk bindings, and mess attachments"
-                phaseTarget="Phase 17"
-              />
+              <HostelsPage />
             </RequireRole>
           }
         />
@@ -175,11 +183,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/messes"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Messes Master"
-                description="Mess facilities, manager assignments, and dining limits"
-                phaseTarget="Phase 17"
-              />
+              <MessesPage />
             </RequireRole>
           }
         />
@@ -187,11 +191,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/students"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Students Registry"
-                description="Student roster, active assignments, and balance ledger"
-                phaseTarget="Phase 17"
-              />
+              <StudentsPage />
             </RequireRole>
           }
         />
@@ -199,11 +199,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/clerks"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Hostel Clerks"
-                description="Clerk user accounts and single-hostel scopes"
-                phaseTarget="Phase 17"
-              />
+              <ClerksPage />
             </RequireRole>
           }
         />
@@ -211,11 +207,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/managers"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Mess Managers"
-                description="Manager accounts, DEC-21 assignments, and device sync status"
-                phaseTarget="Phase 17"
-              />
+              <ManagersPage />
             </RequireRole>
           }
         />
@@ -223,11 +215,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/meal-config"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Meal Configuration & Occurrences"
-                description="35-day scheduled occurrences, cancellations, and timing"
-                phaseTarget="Phase 17"
-              />
+              <MealConfigPage />
             </RequireRole>
           }
         />
@@ -235,11 +223,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/pricing"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Common Meal Rates"
-                description="Effective-dated daily common rate per mess"
-                phaseTarget="Phase 17"
-              />
+              <PricingPage />
             </RequireRole>
           }
         />
@@ -247,11 +231,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/billing"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Billing Periods & Runs"
-                description="Monthly cycle locks, adjustment audits, and ledger posting"
-                phaseTarget="Phase 17"
-              />
+              <BillingPage />
             </RequireRole>
           }
         />
@@ -259,11 +239,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/devices"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Device Registrations"
-                description="Active manager and clerk device bindings, session revocation"
-                phaseTarget="Phase 17"
-              />
+              <DevicesPage />
             </RequireRole>
           }
         />
@@ -271,11 +247,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/sync"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Synchronization & Conflicts"
-                description="Offline manager sync queue, conflict resolution, and change cursors"
-                phaseTarget="Phase 17"
-              />
+              <SyncPage />
             </RequireRole>
           }
         />
@@ -283,11 +255,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/reports"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="Central Reports"
-                description="Cross-hostel consumption, bill summaries, and export runs"
-                phaseTarget="Phase 17"
-              />
+              <AdminReportsPage />
             </RequireRole>
           }
         />
@@ -295,11 +263,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/audit"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="System Audit Logs"
-                description="Immutable audit trail of all sensitive events"
-                phaseTarget="Phase 17"
-              />
+              <AuditLogsPage />
             </RequireRole>
           }
         />
@@ -307,11 +271,7 @@ export const AppRoutes: React.FC = () => {
           path="admin/settings"
           element={
             <RequireRole allowedRoles={['SUPER_ADMIN']}>
-              <FeaturePlaceholder
-                title="System Configuration"
-                description="Effective-dated system settings and app version policies"
-                phaseTarget="Phase 17"
-              />
+              <SystemConfigPage />
             </RequireRole>
           }
         />

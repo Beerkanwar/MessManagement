@@ -4,6 +4,7 @@ Enforces SPEC SDD §64 and Appendix A paths.
 """
 from django.urls import path
 from apps.identity.views import (
+    admin_device_list_view,
     admin_device_revoke_view,
     auth_me_view,
     change_password_view,
@@ -34,6 +35,7 @@ urlpatterns = [
     path("devices/register", device_register_view, name="devices_register"),
     path("devices/revoke", device_revoke_view, name="devices_revoke"),
 
-    # Admin device revocation
+    # Admin device management
+    path("admin/devices", admin_device_list_view, name="admin_devices_list"),
     path("admin/devices/<int:device_id>/revoke", admin_device_revoke_view, name="admin_device_revoke"),
 ]
